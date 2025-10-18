@@ -14,7 +14,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
-        with: { go-version: '1.21' }
+        with: { go-version: '1.24' }
       - name: golangci-lint
         uses: golangci/golangci-lint-action@v4
         with:
@@ -26,7 +26,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
-        with: { go-version: '1.21' }
+        with: { go-version: '1.24' }
       - name: Build
         run: go build ./cmd/dvt-node
       - name: Unit tests with coverage
@@ -44,5 +44,5 @@ jobs:
       - name: Govulncheck
         uses: golang/govulncheck-action@v1
         with:
-          go-version-input: '1.21'
+          go-version-input: '1.24'
           work-dir: .
