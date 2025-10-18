@@ -108,3 +108,4 @@ func TestProxy_UpstreamError(t *testing.T) {
     s.proxy(rr, req)
     if rr.Code != http.StatusBadGateway { t.Fatalf("want 502, got %d", rr.Code) }
 }
+
