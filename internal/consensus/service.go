@@ -2,9 +2,12 @@ package consensus
 
 import (
     "context"
+    "time"
+
     "github.com/zmlAEQ/Aequa-network/pkg/bus"
     "github.com/zmlAEQ/Aequa-network/pkg/lifecycle"
     "github.com/zmlAEQ/Aequa-network/pkg/logger"
+    "github.com/zmlAEQ/Aequa-network/pkg/metrics"
 )
 
 type Service struct{ sub bus.Subscriber }
@@ -19,10 +22,14 @@ func (s *Service) Start(ctx context.Context) error {
         return nil
     }
     go func() {
+        ticker := time.NewTicker(5 * time.Second)
+        defer ticker.Stop()
         for {
             select {
             case ev := <-s.sub:
+                // Audit log + metrics for event intake
                 logger.InfoJ("consensus_recv", map[string]any{"kind": string(ev.Kind)})
+                metrics.Inc("consensus_events_total", map[string]string{"kind": string(ev.Kind)})
             case <-ctx.Done():
                 return
             }
@@ -34,4 +41,3 @@ func (s *Service) Start(ctx context.Context) error {
 func (s *Service) Stop(ctx context.Context) error  { logger.Info("consensus stop (stub)"); return nil }
 
 var _ lifecycle.Service = (*Service)(nil)
-
