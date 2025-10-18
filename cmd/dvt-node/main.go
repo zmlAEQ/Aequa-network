@@ -17,9 +17,14 @@ import (
 )
 
 func main() {
-    var (\n        apiAddr string\n        monAddr string\n        upstream string\n    )
+    var (
+        apiAddr  string
+        monAddr  string
+        upstream string
+    )
     flag.StringVar(&apiAddr, "validator-api", "127.0.0.1:4600", "Validator API listen address")
-    flag.StringVar(&monAddr, "monitoring", "127.0.0.1:4620", "Monitoring listen address")\n    flag.StringVar(&upstream, "upstream", "", "Optional upstream base URL for proxying non-critical requests")
+    flag.StringVar(&monAddr, "monitoring", "127.0.0.1:4620", "Monitoring listen address")
+    flag.StringVar(&upstream, "upstream", "", "Optional upstream base URL for proxying non-critical requests")
     flag.Parse()
 
     ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
@@ -42,4 +47,3 @@ func main() {
     <-ctx.Done()
     _ = m.StopAll(context.Background())
 }
-

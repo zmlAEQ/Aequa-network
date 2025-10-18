@@ -7,7 +7,8 @@ import (
     "time"
 
     "github.com/zimingliu11111111/Aequa-network/pkg/lifecycle"
-    "github.com/zimingliu11111111/Aequa-network/pkg/logger"\n    "github.com/zimingliu11111111/Aequa-network/pkg/metrics"
+    "github.com/zimingliu11111111/Aequa-network/pkg/logger"
+    "github.com/zimingliu11111111/Aequa-network/pkg/metrics"
 )
 
 type Service struct{ addr string; srv *http.Server }
@@ -35,5 +36,3 @@ func (s *Service) Stop(ctx context.Context) error {
 }
 
 var _ lifecycle.Service = (*Service)(nil)
-
-
