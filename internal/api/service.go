@@ -6,21 +6,28 @@ import (
     "fmt"
     "io"
     "net/http"
+    "net/http/httputil"
+    "net/url"
     "time"
 
     "github.com/zimingliu11111111/Aequa-network/pkg/lifecycle"
     "github.com/zimingliu11111111/Aequa-network/pkg/logger"
+    "github.com/zimingliu11111111/Aequa-network/pkg/metrics"
 )
 
-type Service struct{ addr string; srv *http.Server; onPublish func(ctx context.Context, payload []byte) error }
+type Service struct{ addr string; srv *http.Server; onPublish func(ctx context.Context, payload []byte) error; upstream string }
 
-func New(addr string, onPublish func(ctx context.Context, payload []byte) error) *Service { return &Service{addr: addr, onPublish: onPublish} }
+func New(addr string, onPublish func(ctx context.Context, payload []byte) error, upstream string) *Service {
+    return &Service{addr: addr, onPublish: onPublish, upstream: upstream}
+}
+
 func (s *Service) Name() string { return "api" }
 
 func (s *Service) Start(ctx context.Context) error {
     mux := http.NewServeMux()
     mux.HandleFunc("/health", func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(200); _, _ = w.Write([]byte("ok")) })
     mux.HandleFunc("/v1/duty", s.handleDuty)
+    mux.HandleFunc("/", s.proxy)
     s.srv = &http.Server{ Addr: s.addr, Handler: mux }
     go func() {
         logger.Info(fmt.Sprintf("api listening on %s\n", s.addr))
@@ -46,7 +53,12 @@ func (s *Service) handleDuty(w http.ResponseWriter, r *http.Request) {
     b, err := io.ReadAll(http.MaxBytesReader(w, r.Body, 1<<20))
     if err != nil { http.Error(w, "read error", http.StatusBadRequest); return }
     if err := validateDutyJSON(b); err != nil { http.Error(w, err.Error(), http.StatusBadRequest); return }
+
+    start := time.Now()
     if s.onPublish != nil { _ = s.onPublish(r.Context(), b) }
+    dur := time.Since(start)
+    metrics.Inc("api_requests_total", map[string]string{"route":"/v1/duty","code":"202"})
+    logger.Info(fmt.Sprintf("duty_accept route=/v1/duty bytes=%d duration_ms=%d", len(b), dur.Milliseconds()))
     w.WriteHeader(http.StatusAccepted)
 }
 
@@ -71,3 +83,24 @@ func validateDutyJSON(b []byte) error {
     if d.Round > 1<<40 { return fmt.Errorf("round out of range") }
     return nil
 }
+
+func (s *Service) proxy(w http.ResponseWriter, r *http.Request) {
+    if s.upstream == "" { http.NotFound(w, r); return }
+    u, err := url.Parse(s.upstream)
+    if err != nil { http.Error(w, "bad upstream", http.StatusBadGateway); return }
+    rp := httputil.NewSingleHostReverseProxy(u)
+    start := time.Now()
+    rp.ModifyResponse = func(resp *http.Response) error {
+        metrics.Inc("api_requests_total", map[string]string{"route":"proxy","code":fmt.Sprintf("%d", resp.StatusCode)})
+        logger.Info(fmt.Sprintf("proxy code=%d duration_ms=%d", resp.StatusCode, time.Since(start).Milliseconds()))
+        return nil
+    }
+    rp.ErrorHandler = func(w http.ResponseWriter, r *http.Request, e error) {
+        metrics.Inc("api_requests_total", map[string]string{"route":"proxy","code":"502"})
+        logger.Error(fmt.Sprintf("proxy_error err=%s", e.Error()))
+        http.Error(w, "upstream error", http.StatusBadGateway)
+    }
+    rp.ServeHTTP(w, r)
+}
+
+
