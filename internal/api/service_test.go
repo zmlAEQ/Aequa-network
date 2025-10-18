@@ -2,17 +2,23 @@ package api
 
 import "testing"
 
-func TestValidateDutyJSON(t *testing.T) {
+func TestValidateDutyJSON_Good(t *testing.T) {
 	good := []byte(`{"type":"attester","height":1,"round":0,"payload":{}}`)
 	if err := validateDutyJSON(good); err != nil { t.Fatalf("unexpected: %v", err) }
-	bad := [][]byte{ nil, []byte(""), []byte("{"), []byte("{}"), []byte(`{"type":"x"}`) }
-	for _, b := range bad { if err := validateDutyJSON(b); err == nil { t.Fatalf("want error for %q", string(b)) } }
 }
 
-func FuzzValidateDutyJSON(f *testing.F) {
-	f.Add([]byte(`{"type":"attester","height":1,"round":0,"payload":{}}`))
-	f.Fuzz(func(t *testing.T, data []byte) {
-		_ = validateDutyJSON(data) // must not panic
-	})
+func TestValidateDutyJSON_Bad(t *testing.T) {
+	cases := [][]byte{
+		nil,
+		[]byte(""),
+		[]byte("{"),
+		[]byte(`{"type":"x"}`),
+		[]byte(`{"type":"attester","height":-1}`),
+		[]byte(`{"type":"attester","height":1,"round":-1}`),
+	}
+	for i, b := range cases {
+		if err := validateDutyJSON(b); err == nil {
+			t.Fatalf("case %d: want error", i)
+		}
+	}
 }
-

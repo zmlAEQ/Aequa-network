@@ -38,7 +38,7 @@ jobs:
           set -euo pipefail
           total=$(go tool cover -func=coverage.out | awk '/total:/ {print $3}')
           pct=${total%*%}
-          thr=${COVERAGE_MIN:-0}
+          thr=${COVERAGE_MIN:-20}
           echo "coverage=$pct% (threshold=$thr%)"
           awk -v p=$pct -v t=$thr 'BEGIN{ exit (p+0 < t+0) ? 1 : 0 }'
       - name: Govulncheck
@@ -46,5 +46,6 @@ jobs:
         with:
           go-version-input: '1.24'
           work-dir: .
+
 
 
