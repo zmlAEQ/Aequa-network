@@ -9,8 +9,6 @@ bin/
 **/.vscode/
 **/vendor/
 
-docs/
 
-docs/PLAN.md
 
-docs/plan.json
+
