@@ -1,4 +1,4 @@
-﻿package bus
+package bus
 
 import (
 	"context"
