@@ -1,4 +1,4 @@
-﻿package payload
+package payload
 
 type Payload interface { Kind() string }
 

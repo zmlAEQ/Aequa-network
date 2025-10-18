@@ -1,5 +1,3 @@
-﻿module github.com/zimingliu11111111/Aequa-network
+module github.com/zimingliu11111111/Aequa-network
 
 go 1.21
-
-
