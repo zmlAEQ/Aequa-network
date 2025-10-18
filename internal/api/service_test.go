@@ -55,3 +55,19 @@ func TestHandleDuty_EmptyBody(t *testing.T) {
     s.handleDuty(rr, req)
     if rr.Code != http.StatusBadRequest { t.Fatalf("want 400, got %d", rr.Code) }
 }
+func TestValidateDutyJSON_OutOfRange(t *testing.T) {
+    b := []byte(`{"type":"attester","height":4611686018427387908,"round":0,"payload":{}}`)
+    if err := validateDutyJSON(b); err == nil {
+        t.Fatalf("want error for out-of-range height")
+    }
+}
+
+func TestHandleDuty_OversizeBody(t *testing.T) {
+    s := &Service{}
+    rr := httptest.NewRecorder()
+    big := make([]byte, (1<<20)+1)
+    for i := range big { big[i] = 'a' }
+    req := httptest.NewRequest(http.MethodPost, "/v1/duty", bytes.NewReader(big))
+    s.handleDuty(rr, req)
+    if rr.Code != http.StatusBadRequest { t.Fatalf("want 400, got %d", rr.Code) }
+}
