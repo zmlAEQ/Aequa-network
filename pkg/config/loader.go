@@ -20,3 +20,4 @@ func LoadClusterLock(path string) (ClusterLock, error) {
     err = json.Unmarshal(b, &c)
     return c, err
 }
+

@@ -33,3 +33,4 @@ func (b *Bus) Publish(_ context.Context, ev Event) {
 }
 
 func (b *Bus) Subscribe() Subscriber { return b.pub }
+
