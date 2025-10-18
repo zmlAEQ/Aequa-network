@@ -7,12 +7,12 @@ import (
     "os/signal"
     "syscall"
 
-    "modular-dvt-engine/internal/api"
-    "modular-dvt-engine/internal/consensus"
-    "modular-dvt-engine/internal/monitoring"
-    "modular-dvt-engine/internal/p2p"
-    "modular-dvt-engine/pkg/lifecycle"
-    "modular-dvt-engine/pkg/logger"
+    "github.com/zimingliu11111111/Aequa-network/internal/api"
+    "github.com/zimingliu11111111/Aequa-network/internal/consensus"
+    "github.com/zimingliu11111111/Aequa-network/internal/monitoring"
+    "github.com/zimingliu11111111/Aequa-network/internal/p2p"
+    "github.com/zimingliu11111111/Aequa-network/pkg/lifecycle"
+    "github.com/zimingliu11111111/Aequa-network/pkg/logger"
 )
 
 func main() {
@@ -37,3 +37,4 @@ func main() {
     <-ctx.Done()
     _ = m.StopAll(context.Background())
 }
+

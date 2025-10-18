@@ -6,8 +6,8 @@ import (
     "net/http"
     "time"
 
-    "modular-dvt-engine/pkg/lifecycle"
-    "modular-dvt-engine/pkg/logger"
+    "github.com/zimingliu11111111/Aequa-network/pkg/lifecycle"
+    "github.com/zimingliu11111111/Aequa-network/pkg/logger"
 )
 
 type Service struct{ addr string; srv *http.Server }
@@ -35,3 +35,4 @@ func (s *Service) Stop(ctx context.Context) error {
 }
 
 var _ lifecycle.Service = (*Service)(nil)
+
