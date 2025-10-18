@@ -1,1 +1,0 @@
-{"type":"attester","height":1,"round":0,"payload":{}}
