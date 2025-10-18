@@ -1,0 +1,10 @@
+﻿{
+  "name": "example-cluster",
+  "threshold": 3,
+  "operators": [
+    {"index": 0, "peer_id": "node0"},
+    {"index": 1, "peer_id": "node1"},
+    {"index": 2, "peer_id": "node2"},
+    {"index": 3, "peer_id": "node3"}
+  ]
+}

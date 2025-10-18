@@ -1,0 +1,16 @@
+﻿# Binaries
+bin/
+*.exe
+*.out
+*.log
+# Go build cache
+**/.DS_Store
+**/.idea/
+**/.vscode/
+**/vendor/
+
+docs/
+
+docs/PLAN.md
+
+docs/plan.json
