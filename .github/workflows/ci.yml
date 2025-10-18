@@ -1,9 +1,9 @@
 ﻿name: ci
 on:
   push:
-    branches: [ main ]
+    branches: [ main, 'feature/**', 'chore/**' ]
   pull_request:
-    branches: [ main ]
+    branches: [ main, 'feature/**', 'chore/**' ]
 permissions: { contents: read }
 concurrency:
   group: ci-${{ github.ref }}
@@ -46,4 +46,5 @@ jobs:
         with:
           go-version-input: '1.21'
           work-dir: .
+
 
