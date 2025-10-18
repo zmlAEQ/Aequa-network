@@ -2,9 +2,9 @@ package consensus
 
 import (
     "context"
-    "github.com/zimingliu11111111/Aequa-network/pkg/bus"
-    "github.com/zimingliu11111111/Aequa-network/pkg/lifecycle"
-    "github.com/zimingliu11111111/Aequa-network/pkg/logger"
+    "github.com/zmlAEQ/Aequa-network/pkg/bus"
+    "github.com/zmlAEQ/Aequa-network/pkg/lifecycle"
+    "github.com/zmlAEQ/Aequa-network/pkg/logger"
 )
 
 type Service struct{ sub bus.Subscriber }
@@ -34,3 +34,4 @@ func (s *Service) Start(ctx context.Context) error {
 func (s *Service) Stop(ctx context.Context) error  { logger.Info("consensus stop (stub)"); return nil }
 
 var _ lifecycle.Service = (*Service)(nil)
+

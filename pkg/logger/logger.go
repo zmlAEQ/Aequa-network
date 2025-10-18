@@ -25,3 +25,4 @@ func logJ(level, msg string, fields map[string]any) {
     b, _ := json.Marshal(fields)
     std.Println(string(b))
 }
+

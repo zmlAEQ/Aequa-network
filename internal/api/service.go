@@ -10,9 +10,9 @@ import (
     "net/url"
     "time"
 
-    "github.com/zimingliu11111111/Aequa-network/pkg/lifecycle"
-    "github.com/zimingliu11111111/Aequa-network/pkg/logger"
-    "github.com/zimingliu11111111/Aequa-network/pkg/metrics"
+    "github.com/zmlAEQ/Aequa-network/pkg/lifecycle"
+    "github.com/zmlAEQ/Aequa-network/pkg/logger"
+    "github.com/zmlAEQ/Aequa-network/pkg/metrics"
 )
 
 type Service struct{ addr string; srv *http.Server; onPublish func(ctx context.Context, payload []byte) error; upstream string }
@@ -102,6 +102,7 @@ func (s *Service) proxy(w http.ResponseWriter, r *http.Request) {
     }
     rp.ServeHTTP(w, r)
 }
+
 
 
 

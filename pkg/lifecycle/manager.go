@@ -35,3 +35,4 @@ func (m *Manager) StopAll(ctx context.Context) error {
     wg.Wait()
     return nil
 }
+

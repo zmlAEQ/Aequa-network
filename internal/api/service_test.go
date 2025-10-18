@@ -15,3 +15,4 @@ func FuzzValidateDutyJSON(f *testing.F) {
 		_ = validateDutyJSON(data) // must not panic
 	})
 }
+

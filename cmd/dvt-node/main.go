@@ -7,13 +7,13 @@ import (
     "os/signal"
     "syscall"
 
-    "github.com/zimingliu11111111/Aequa-network/internal/api"
-    "github.com/zimingliu11111111/Aequa-network/internal/consensus"
-    "github.com/zimingliu11111111/Aequa-network/internal/monitoring"
-    "github.com/zimingliu11111111/Aequa-network/internal/p2p"
-    "github.com/zimingliu111111111/Aequa-network/pkg/bus"
-    "github.com/zimingliu11111111/Aequa-network/pkg/lifecycle"
-    "github.com/zimingliu11111111/Aequa-network/pkg/logger"
+    "github.com/zmlAEQ/Aequa-network/internal/api"
+    "github.com/zmlAEQ/Aequa-network/internal/consensus"
+    "github.com/zmlAEQ/Aequa-network/internal/monitoring"
+    "github.com/zmlAEQ/Aequa-network/internal/p2p"
+    "github.com/zmlAEQ/Aequa-network/pkg/bus"
+    "github.com/zmlAEQ/Aequa-network/pkg/lifecycle"
+    "github.com/zmlAEQ/Aequa-network/pkg/logger"
 )
 
 func main() {
@@ -46,3 +46,4 @@ func main() {
     <-ctx.Done()
     _ = m.StopAll(context.Background())
 }
+

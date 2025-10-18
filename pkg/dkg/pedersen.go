@@ -9,3 +9,4 @@ func Generate(n, t int) ([]Share, error) {
     // TODO: implement
     return make([]Share, n), nil
 }
+

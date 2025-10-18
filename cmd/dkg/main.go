@@ -7,3 +7,4 @@ import (
 func main() {
     fmt.Println("dkg tool placeholder: generate cluster-lock.json here")
 }
+
