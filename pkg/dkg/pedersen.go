@@ -1,4 +1,4 @@
-﻿package dkg
+package dkg
 
 // Placeholder for Pedersen VSS-based DKG primitives.
 // Implement share generation/verification here.
