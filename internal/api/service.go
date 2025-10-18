@@ -92,15 +92,16 @@ func (s *Service) proxy(w http.ResponseWriter, r *http.Request) {
     start := time.Now()
     rp.ModifyResponse = func(resp *http.Response) error {
         metrics.Inc("api_requests_total", map[string]string{"route":"proxy","code":fmt.Sprintf("%d", resp.StatusCode)})
-        logger.Info(fmt.Sprintf("proxy code=%d duration_ms=%d", resp.StatusCode, time.Since(start).Milliseconds()))
+        logger.InfoJ("proxy", map[string]any{"code": resp.StatusCode, "duration_ms": time.Since(start).Milliseconds()})
         return nil
     }
     rp.ErrorHandler = func(w http.ResponseWriter, r *http.Request, e error) {
         metrics.Inc("api_requests_total", map[string]string{"route":"proxy","code":"502"})
-        logger.Error(fmt.Sprintf("proxy_error err=%s", e.Error()))
+        logger.ErrorJ("proxy_error", map[string]any{"err": e.Error()})
         http.Error(w, "upstream error", http.StatusBadGateway)
     }
     rp.ServeHTTP(w, r)
 }
+
 
 

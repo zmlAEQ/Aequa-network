@@ -11,7 +11,7 @@ import (
     "github.com/zimingliu11111111/Aequa-network/internal/consensus"
     "github.com/zimingliu11111111/Aequa-network/internal/monitoring"
     "github.com/zimingliu11111111/Aequa-network/internal/p2p"
-    "github.com/zimingliu11111111/Aequa-network/pkg/bus"
+    "github.com/zimingliu111111111/Aequa-network/pkg/bus"
     "github.com/zimingliu11111111/Aequa-network/pkg/lifecycle"
     "github.com/zimingliu11111111/Aequa-network/pkg/logger"
 )
@@ -32,7 +32,6 @@ func main() {
 
     b := bus.New(256)
     publish := func(ctx context.Context, payload []byte) error {
-        // TODO: decode, map to consensus Event and publish on bus
         b.Publish(ctx, bus.Event{Kind: bus.KindDuty, Body: payload})
         return nil
     }
@@ -41,7 +40,7 @@ func main() {
     m.Add(api.New(apiAddr, publish, upstream))
     m.Add(monitoring.New(monAddr))
     m.Add(p2p.New())
-    m.Add(consensus.New())
+    m.Add(consensus.NewWithSub(b.Subscribe()))
 
     if err := m.StartAll(ctx); err != nil { logger.Error(err.Error()); os.Exit(1) }
     <-ctx.Done()
