@@ -1,4 +1,4 @@
-package main
+﻿package main
 
 import (
     "context"
@@ -17,12 +17,9 @@ import (
 )
 
 func main() {
-    var (
-        apiAddr string
-        monAddr string
-    )
+    var (\n        apiAddr string\n        monAddr string\n        upstream string\n    )
     flag.StringVar(&apiAddr, "validator-api", "127.0.0.1:4600", "Validator API listen address")
-    flag.StringVar(&monAddr, "monitoring", "127.0.0.1:4620", "Monitoring listen address")
+    flag.StringVar(&monAddr, "monitoring", "127.0.0.1:4620", "Monitoring listen address")\n    flag.StringVar(&upstream, "upstream", "", "Optional upstream base URL for proxying non-critical requests")
     flag.Parse()
 
     ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
@@ -36,7 +33,7 @@ func main() {
     }
 
     m := lifecycle.New()
-    m.Add(api.New(apiAddr, publish))
+    m.Add(api.New(apiAddr, publish, upstream))
     m.Add(monitoring.New(monAddr))
     m.Add(p2p.New())
     m.Add(consensus.New())
@@ -45,3 +42,4 @@ func main() {
     <-ctx.Done()
     _ = m.StopAll(context.Background())
 }
+

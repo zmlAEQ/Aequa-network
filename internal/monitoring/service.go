@@ -1,4 +1,4 @@
-package monitoring
+﻿package monitoring
 
 import (
     "context"
@@ -7,7 +7,7 @@ import (
     "time"
 
     "github.com/zimingliu11111111/Aequa-network/pkg/lifecycle"
-    "github.com/zimingliu11111111/Aequa-network/pkg/logger"
+    "github.com/zimingliu11111111/Aequa-network/pkg/logger"\n    "github.com/zimingliu11111111/Aequa-network/pkg/metrics"
 )
 
 type Service struct{ addr string; srv *http.Server }
@@ -17,7 +17,7 @@ func (s *Service) Name() string { return "monitoring" }
 
 func (s *Service) Start(ctx context.Context) error {
     mux := http.NewServeMux()
-    mux.HandleFunc("/metrics", func(w http.ResponseWriter, _ *http.Request) { _, _ = w.Write([]byte("# HELP dvt_up 1\n# TYPE dvt_up gauge\ndvt_up 1\n")) })
+    mux.HandleFunc("/metrics", func(w http.ResponseWriter, _ *http.Request) { _, _ = w.Write([]byte(metrics.DumpProm())) })
     s.srv = &http.Server{ Addr: s.addr, Handler: mux }
     go func() {
         logger.Info(fmt.Sprintf("monitoring on %s\n", s.addr))
@@ -35,4 +35,5 @@ func (s *Service) Stop(ctx context.Context) error {
 }
 
 var _ lifecycle.Service = (*Service)(nil)
+
 
