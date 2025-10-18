@@ -1,0 +1,30 @@
+﻿services:
+  aequa-node-0:
+    build: .
+    image: aequa-local:latest
+    container_name: aequa-node-0
+    command: ["--validator-api","0.0.0.0:4600","--monitoring","0.0.0.0:4620"]
+    ports:
+      - "4600:4600"
+      - "4620:4620"
+  aequa-node-1:
+    image: aequa-local:latest
+    container_name: aequa-node-1
+    command: ["--validator-api","0.0.0.0:4600","--monitoring","0.0.0.0:4620"]
+    ports:
+      - "4601:4600"
+      - "4621:4620"
+  aequa-node-2:
+    image: aequa-local:latest
+    container_name: aequa-node-2
+    command: ["--validator-api","0.0.0.0:4600","--monitoring","0.0.0.0:4620"]
+    ports:
+      - "4602:4600"
+      - "4622:4620"
+  aequa-node-3:
+    image: aequa-local:latest
+    container_name: aequa-node-3
+    command: ["--validator-api","0.0.0.0:4600","--monitoring","0.0.0.0:4620"]
+    ports:
+      - "4603:4600"
+      - "4623:4620"

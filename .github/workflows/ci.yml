@@ -1,0 +1,23 @@
+﻿name: ci
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+permissions: { contents: read }
+jobs:
+  build-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with: { go-version: '1.21' }
+      - name: Build
+        run: go build ./cmd/dvt-node
+      - name: Unit tests
+        run: go test ./... -coverprofile=coverage.out
+      - name: Govulncheck
+        uses: golang/govulncheck-action@v1
+        with:
+          go-version-input: '1.21'
+          work-dir: .
