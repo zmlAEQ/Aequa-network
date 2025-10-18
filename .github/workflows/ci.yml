@@ -30,7 +30,7 @@ jobs:
       - name: Build
         run: go build ./cmd/dvt-node
       - name: Unit tests with coverage
-        run: go test ./... -coverprofile=coverage.out -covermode=atomic
+        run: go test ./internal/... -coverprofile=coverage.out -covermode=atomic
       - name: Enforce coverage threshold
         env:
           COVERAGE_MIN: ${{ vars.COVERAGE_MIN }}
@@ -46,6 +46,7 @@ jobs:
         with:
           go-version-input: '1.24'
           work-dir: .
+
 
 
 

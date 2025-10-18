@@ -22,3 +22,36 @@ func TestValidateDutyJSON_Bad(t *testing.T) {
 		}
 	}
 }
+package api
+
+import (
+    "bytes"
+    "net/http"
+    "net/http/httptest"
+    "testing"
+)
+
+func TestHandleDuty_Success(t *testing.T) {
+    s := &Service{onPublish: func(_ context.Context, p []byte) error { return nil }}
+    rr := httptest.NewRecorder()
+    body := []byte(`{"type":"attester","height":1,"round":0,"payload":{}}`)
+    req := httptest.NewRequest(http.MethodPost, "/v1/duty", bytes.NewReader(body))
+    s.handleDuty(rr, req)
+    if rr.Code != http.StatusAccepted { t.Fatalf("want 202, got %d", rr.Code) }
+}
+
+func TestHandleDuty_MethodNotAllowed(t *testing.T) {
+    s := &Service{}
+    rr := httptest.NewRecorder()
+    req := httptest.NewRequest(http.MethodGet, "/v1/duty", nil)
+    s.handleDuty(rr, req)
+    if rr.Code != http.StatusMethodNotAllowed { t.Fatalf("want 405, got %d", rr.Code) }
+}
+
+func TestHandleDuty_EmptyBody(t *testing.T) {
+    s := &Service{}
+    rr := httptest.NewRecorder()
+    req := httptest.NewRequest(http.MethodPost, "/v1/duty", nil)
+    s.handleDuty(rr, req)
+    if rr.Code != http.StatusBadRequest { t.Fatalf("want 400, got %d", rr.Code) }
+}
