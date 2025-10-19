@@ -1,4 +1,4 @@
-package api
+﻿package api
 
 import (
     "context"
@@ -27,7 +27,7 @@ func (s *Service) Name() string { return "api" }
 func (s *Service) Start(ctx context.Context) error {
     begin := time.Now()
     mux := http.NewServeMux()
-    mux.HandleFunc("/health", s.handleHealth) { w.WriteHeader(200); _, _ = w.Write([]byte("ok")) })
+    mux.HandleFunc("/health", s.handleHealth)
     mux.HandleFunc("/v1/duty", s.handleDuty)
     mux.HandleFunc("/", s.proxy)
     s.srv = &http.Server{ Addr: s.addr, Handler: mux }
