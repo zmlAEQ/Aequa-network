@@ -1,4 +1,4 @@
-package consensus
+﻿package consensus
 
 import (
     "context"
@@ -28,7 +28,7 @@ func (s *Service) Start(ctx context.Context) error {
             select {
             case ev := <-s.sub:
                 // Audit log + metrics for event intake
-                logger.InfoJ("consensus_recv", map[string]any{"kind": string(ev.Kind)})
+                logger.InfoJ("consensus_recv", map[string]any{"kind": string(ev.Kind), "trace_id": ev.TraceID, "result": "recv"})
                 metrics.Inc("consensus_events_total", map[string]string{"kind": string(ev.Kind)})
             case <-ctx.Done():
                 return
@@ -41,3 +41,4 @@ func (s *Service) Start(ctx context.Context) error {
 func (s *Service) Stop(ctx context.Context) error  { logger.Info("consensus stop (stub)"); return nil }
 
 var _ lifecycle.Service = (*Service)(nil)
+

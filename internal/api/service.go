@@ -59,6 +59,7 @@ func (s *Service) handleDuty(w http.ResponseWriter, r *http.Request) {
     if s.onPublish != nil { _ = s.onPublish(trace.WithTraceID(r.Context(), traceID(r)), b) }
     dur := time.Since(start)
     metrics.Inc("api_requests_total", map[string]string{"route":"/v1/duty","code":"202"})
+    metrics.ObserveSummary("api_latency_ms", map[string]string{"route":"/v1/duty"}, float64(dur.Milliseconds()))
     logger.InfoJ("api_request", map[string]any{
         "route": "/v1/duty",
         "code":  202,
@@ -100,6 +101,7 @@ func (s *Service) proxy(w http.ResponseWriter, r *http.Request) {
     start := time.Now()
     rp.ModifyResponse = func(resp *http.Response) error {
         metrics.Inc("api_requests_total", map[string]string{"route":"proxy","code":fmt.Sprintf("%d", resp.StatusCode)})
+        metrics.ObserveSummary("api_latency_ms", map[string]string{"route":"proxy"}, float64(time.Since(start).Milliseconds()))
         logger.InfoJ("api_request", map[string]any{
             "route": "proxy",
             "code": resp.StatusCode,
@@ -111,6 +113,7 @@ func (s *Service) proxy(w http.ResponseWriter, r *http.Request) {
     }
     rp.ErrorHandler = func(w http.ResponseWriter, r *http.Request, e error) {
         metrics.Inc("api_requests_total", map[string]string{"route":"proxy","code":"502"})
+        metrics.ObserveSummary("api_latency_ms", map[string]string{"route":"proxy"}, float64(time.Since(start).Milliseconds()))
         logger.ErrorJ("api_request", map[string]any{
             "route": "proxy",
             "code": 502,
