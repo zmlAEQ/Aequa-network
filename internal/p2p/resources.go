@@ -1,6 +1,9 @@
 package p2p
 
-import ("sync/atomic"`n    "github.com/zmlAEQ/Aequa-network/pkg/metrics")
+import (
+    "sync/atomic"
+    "github.com/zmlAEQ/Aequa-network/pkg/metrics"
+)
 
 // ResourceLimits define basic resource caps for P2P.
 type ResourceLimits struct{ MaxConns int64 }
