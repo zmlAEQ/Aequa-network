@@ -48,10 +48,19 @@ func NewWithOpts(mgr *Manager, gate Gate, rman *ResourceManager, hook Hook) *Ser
 // Connect tries to admit and register a peer according to gate and resources.
 func (s *Service) Connect(id PeerID) error {
     labels := map[string]string{"result":"allowed"}
-    if !s.gate.Allow(id) {
-        labels["result"] = "denied"
-        metrics.Inc("p2p_conn_attempts_total", labels)
-        return fmt.Errorf("peer denied")
+    if rg, ok := any(s.gate).(ReasonedGate); ok {
+        if ok2, reason := rg.AllowWithReason(id); !ok2 {
+            if reason == "" { reason = "denied" }
+            labels["result"] = reason
+            metrics.Inc("p2p_conn_attempts_total", labels)
+            return fmt.Errorf("peer denied")
+        }
+    } else {
+        if !s.gate.Allow(id) {
+            labels["result"] = "denied"
+            metrics.Inc("p2p_conn_attempts_total", labels)
+            return fmt.Errorf("peer denied")
+        }
     }
     if !s.rman.TryOpen() {
         labels["result"] = "limited"
