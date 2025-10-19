@@ -25,6 +25,7 @@ func New(addr string, onPublish func(ctx context.Context, payload []byte) error,
 func (s *Service) Name() string { return "api" }
 
 func (s *Service) Start(ctx context.Context) error {
+    begin := time.Now()
     mux := http.NewServeMux()
     mux.HandleFunc("/health", func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(200); _, _ = w.Write([]byte("ok")) })
     mux.HandleFunc("/v1/duty", s.handleDuty)
@@ -36,15 +37,30 @@ func (s *Service) Start(ctx context.Context) error {
             logger.Error("api server error: "+err.Error())
         }
     }()
+    dur := time.Since(begin).Milliseconds()
+    logger.InfoJ("service_op", map[string]any{"service":"api", "op":"start", "result":"ok", "latency_ms": dur})
+    metrics.ObserveSummary("service_op_ms", map[string]string{"service":"api", "op":"start"}, float64(dur))
     return nil
 }
-
 func (s *Service) Stop(ctx context.Context) error {
-    if s.srv == nil { return nil }
-    ctx, cancel := context.WithTimeout(ctx, 3*time.Second); defer cancel()
-    return s.srv.Shutdown(ctx)
+    begin := time.Now()
+    if s.srv == nil {
+        dur := time.Since(begin).Milliseconds()
+        logger.InfoJ("service_op", map[string]any{"service":"api", "op":"stop", "result":"ok", "latency_ms": dur})
+        metrics.ObserveSummary("service_op_ms", map[string]string{"service":"api", "op":"stop"}, float64(dur))
+        return nil
+    }
+    ctx2, cancel := context.WithTimeout(ctx, 3*time.Second); defer cancel()
+    err := s.srv.Shutdown(ctx2)
+    dur := time.Since(begin).Milliseconds()
+    if err != nil {
+        logger.ErrorJ("service_op", map[string]any{"service":"api", "op":"stop", "result":"error", "err": err.Error(), "latency_ms": dur})
+    } else {
+        logger.InfoJ("service_op", map[string]any{"service":"api", "op":"stop", "result":"ok", "latency_ms": dur})
+    }
+    metrics.ObserveSummary("service_op_ms", map[string]string{"service":"api", "op":"stop"}, float64(dur))
+    return err
 }
-
 var _ lifecycle.Service = (*Service)(nil)
 
 // handleDuty accepts a JSON body and publishes it after basic validation.
