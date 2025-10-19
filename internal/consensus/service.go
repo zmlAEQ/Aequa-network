@@ -29,9 +29,10 @@ func (s *Service) Start(ctx context.Context) error {
             case ev := <-s.sub:
                 start := time.Now()
                 // Audit log + metrics for event intake
-                logger.InfoJ("consensus_recv", map[string]any{"kind": string(ev.Kind), "trace_id": ev.TraceID, "result": "recv"})
+                dur := time.Since(start)
+                logger.InfoJ("consensus_recv", map[string]any{"kind": string(ev.Kind), "trace_id": ev.TraceID, "result": "recv", "latency_ms": dur.Milliseconds()})
                 metrics.Inc("consensus_events_total", map[string]string{"kind": string(ev.Kind)})
-                metrics.ObserveSummary("consensus_proc_ms", map[string]string{"kind": string(ev.Kind)}, float64(time.Since(start).Milliseconds()))
+                metrics.ObserveSummary("consensus_proc_ms", map[string]string{"kind": string(ev.Kind)}, float64(dur.Milliseconds()))
             case <-ctx.Done():
                 return
             }
