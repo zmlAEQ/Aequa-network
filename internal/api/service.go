@@ -24,7 +24,7 @@ func New(addr string, onPublish func(ctx context.Context, payload []byte) error,
 
 func (s *Service) Name() string { return "api" }
 
-func (s *Service) Start(ctx context.Context) error {
+func (s *Service) Start(ctx context.Context) error {\r\n    begin := time.Now()
     mux := http.NewServeMux()
     mux.HandleFunc("/health", func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(200); _, _ = w.Write([]byte("ok")) })
     mux.HandleFunc("/v1/duty", s.handleDuty)
