@@ -1,4 +1,4 @@
-package lifecycle
+﻿package lifecycle
 
 import (
     "context"
@@ -11,37 +11,38 @@ type Service interface {
     Stop(ctx context.Context) error
 }
 
-type Manager struct { svcs []Service }
+type Manager struct {
+    svcs []Service
+}
 
 func New() *Manager { return &Manager{} }
 func (m *Manager) Add(s Service) { m.svcs = append(m.svcs, s) }
 
-// StartAll starts services in order. On failure it stops the already started
-// services in reverse order and returns a joined error containing the original
-// start error and any rollback errors.
+// StartAll 按顺序启动；若某服务启动失败，则按逆序回滚已启动服务，并聚合错误返回。
 func (m *Manager) StartAll(ctx context.Context) error {
-    started := 0
-    for i, s := range m.svcs {
+    var started []Service
+    for _, s := range m.svcs {
         if err := s.Start(ctx); err != nil {
-            // rollback previously started services in reverse
-            var merr error = err
-            for j := i - 1; j >= 0; j-- {
-                if rerr := m.svcs[j].Stop(ctx); rerr != nil { merr = errors.Join(merr, rerr) }
+            agg := err
+            for i := len(started) - 1; i >= 0; i-- {
+                if stopErr := started[i].Stop(ctx); stopErr != nil {
+                    agg = errors.Join(agg, stopErr)
+                }
             }
-            return merr
+            return agg
         }
-        started++
+        started = append(started, s)
     }
-    _ = started
     return nil
 }
 
-// StopAll stops services in reverse order. It attempts to stop all and returns
-// a joined error if any stop fails.
+// StopAll 按逆序关闭所有服务，并聚合所有停止错误。
 func (m *Manager) StopAll(ctx context.Context) error {
-    var merr error
+    var agg error
     for i := len(m.svcs) - 1; i >= 0; i-- {
-        if err := m.svcs[i].Stop(ctx); err != nil { merr = errors.Join(merr, err) }
+        if err := m.svcs[i].Stop(ctx); err != nil {
+            agg = errors.Join(agg, err)
+        }
     }
-    return merr
+    return agg
 }
