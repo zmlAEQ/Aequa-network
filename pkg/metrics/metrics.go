@@ -1,6 +1,6 @@
-package metrics
+﻿package metrics
 
-import (
+import ("math" 
     "fmt"
     "sort"
     "strings"
@@ -37,6 +37,17 @@ func Inc(name string, labels map[string]string) {
     atomic.AddUint64(p, 1)
 }
 
+func ObserveSummary(name string, labels map[string]string, value float64) {
+    if math.IsNaN(value) || math.IsInf(value, 0) { return }
+    key := summaryKey{name: name, labels: labelsKey(labels)}
+    summaryMu.Lock()
+    v := summaries[key]
+    if v == nil { v = &summaryVal{}; summaries[key] = v }
+    v.sum += uint64(value)
+    v.count++
+    summaryMu.Unlock()
+}
+
 func DumpProm() string {
     countersMu.RLock(); defer countersMu.RUnlock()
     var sb strings.Builder
@@ -55,4 +66,16 @@ func DumpProm() string {
     return sb.String()
 }
 
+
+
+
+
+// --- lightweight summary (histogram-lite) ---
+type summaryKey struct{ name string; labels string }
+type summaryVal struct{ sum uint64; count uint64 }
+
+var (
+    summaryMu sync.RWMutex
+    summaries = map[summaryKey]*summaryVal{}
+)
 
