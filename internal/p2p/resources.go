@@ -32,6 +32,6 @@ func (r *ResourceManager) Close() {
     for {
         o := atomic.LoadInt64(&r.open)
         if o <= 0 { return }
-        if atomic.CompareAndSwapInt64(&r.open, o, o-1) { metrics.Inc("p2p_conn_close_total", nil); return }
+        if atomic.CompareAndSwapInt64(&r.open, o, o-1) { metrics.Inc("p2p_conn_close_total", nil); metrics.AddGauge("p2p_conns_open", nil, -1); return }
     }
 }

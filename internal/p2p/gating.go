@@ -1,8 +1,11 @@
 package p2p
 
 import (
+    "sync"
     "sync/atomic"
-)// Gate decides whether a peer is allowed to connect.
+)
+
+// Gate decides whether a peer is allowed to connect.
 type Gate interface { Allow(id PeerID) bool }
 
 // AllowAllGate admits all peers (default in minimal setup).
@@ -12,20 +15,31 @@ func (AllowAllGate) Allow(id PeerID) bool { return true }
 // StaticDenyGate denies all peers (used in tests).
 type StaticDenyGate struct{}
 func (StaticDenyGate) Allow(id PeerID) bool { return false }
-// AllowListGate admits only peers present in its in-memory allowlist.
-type AllowListGate struct{ allowed map[PeerID]struct{} }
+
+// AllowListGate admits only peers present in its in-memory allowlist and supports dynamic updates.
+type AllowListGate struct{
+    mu      sync.RWMutex
+    allowed map[PeerID]struct{}
+}
 
 // NewAllowListGate constructs an allowlist gate from the provided peer IDs.
-func NewAllowListGate(ids ...PeerID) AllowListGate {
+func NewAllowListGate(ids ...PeerID) *AllowListGate {
     m := make(map[PeerID]struct{}, len(ids))
     for _, id := range ids { m[id] = struct{}{} }
-    return AllowListGate{allowed: m}
+    return &AllowListGate{allowed: m}
 }
 
-func (g AllowListGate) Allow(id PeerID) bool {
-    _, ok := g.allowed[id]
+func (g *AllowListGate) Allow(id PeerID) bool {
+    g.mu.RLock(); _, ok := g.allowed[id]; g.mu.RUnlock()
     return ok
 }
+
+// Add inserts a peer id into the allowlist.
+func (g *AllowListGate) Add(id PeerID) { g.mu.Lock(); g.allowed[id] = struct{}{}; g.mu.Unlock() }
+
+// Remove deletes a peer id from the allowlist.
+func (g *AllowListGate) Remove(id PeerID) { g.mu.Lock(); delete(g.allowed, id); g.mu.Unlock() }
+
 // ReasonedGate optionally returns a reason when denying a peer.
 type ReasonedGate interface { AllowWithReason(id PeerID) (bool, string) }
 
