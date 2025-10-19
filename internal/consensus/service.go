@@ -27,9 +27,11 @@ func (s *Service) Start(ctx context.Context) error {
         for {
             select {
             case ev := <-s.sub:
+                start := time.Now()
                 // Audit log + metrics for event intake
                 logger.InfoJ("consensus_recv", map[string]any{"kind": string(ev.Kind), "trace_id": ev.TraceID, "result": "recv"})
                 metrics.Inc("consensus_events_total", map[string]string{"kind": string(ev.Kind)})
+                metrics.ObserveSummary("consensus_proc_ms", map[string]string{"kind": string(ev.Kind)}, float64(time.Since(start).Milliseconds()))
             case <-ctx.Done():
                 return
             }
@@ -41,4 +43,5 @@ func (s *Service) Start(ctx context.Context) error {
 func (s *Service) Stop(ctx context.Context) error  { logger.Info("consensus stop (stub)"); return nil }
 
 var _ lifecycle.Service = (*Service)(nil)
+
 
