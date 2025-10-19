@@ -138,3 +138,26 @@ func traceID(r *http.Request) string {
 
 
 
+
+// logAPI records unified metrics and logs, then writes an error response body.
+func (s *Service) logAPI(w http.ResponseWriter, route string, code int, start time.Time, tid, result, errMsg string) {
+    dur := time.Since(start)
+    metrics.Inc("api_requests_total", map[string]string{"route":route, "code":fmt.Sprintf("%d", code)})
+    metrics.ObserveSummary("api_latency_ms", map[string]string{"route":route}, float64(dur.Milliseconds()))
+    fields := map[string]any{
+        "route": route,
+        "code":  code,
+        "latency_ms": dur.Milliseconds(),
+        "result": result,
+        "trace_id": tid,
+    }
+    if errMsg != "" { fields["err"] = errMsg }
+    if code >= 400 {
+        logger.ErrorJ("api_request", fields)
+    } else {
+        logger.InfoJ("api_request", fields)
+    }
+    body := errMsg
+    if body == "" { body = http.StatusText(code) }
+    http.Error(w, body, code)
+}
