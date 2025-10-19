@@ -10,8 +10,25 @@ concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
 jobs:
+  verify-bom:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check UTF-8 BOM not present in .go files
+        shell: bash
+        run: |
+          set -euo pipefail
+          err=0
+          while IFS= read -r -d '' f; do
+            if grep -Iq $'\xEF\xBB\xBF' "$f"; then
+              echo "::error file=$f::BOM found"
+              err=1
+            fi
+          done < <(git ls-files -z '*.go')
+          test $err -eq 0
   lint:
     runs-on: ubuntu-latest
+    needs: [verify-bom]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
