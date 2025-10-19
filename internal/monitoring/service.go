@@ -27,15 +27,30 @@ func (s *Service) Start(ctx context.Context) error {
             logger.Error("monitoring server error: "+err.Error())
         }
     }()
+    dur := time.Since(begin).Milliseconds()
+    logger.InfoJ("service_op", map[string]any{"service":"monitoring", "op":"start", "result":"ok", "latency_ms": dur})
+    metrics.ObserveSummary("service_op_ms", map[string]string{"service":"monitoring", "op":"start"}, float64(dur))
     return nil
 }
-
 func (s *Service) Stop(ctx context.Context) error {
-    if s.srv == nil { return nil }
-    ctx, cancel := context.WithTimeout(ctx, 3*time.Second); defer cancel()
-    return s.srv.Shutdown(ctx)
+    begin := time.Now()
+    if s.srv == nil {
+        dur := time.Since(begin).Milliseconds()
+        logger.InfoJ("service_op", map[string]any{"service":"monitoring", "op":"stop", "result":"ok", "latency_ms": dur})
+        metrics.ObserveSummary("service_op_ms", map[string]string{"service":"monitoring", "op":"stop"}, float64(dur))
+        return nil
+    }
+    ctx2, cancel := context.WithTimeout(ctx, 3*time.Second); defer cancel()
+    err := s.srv.Shutdown(ctx2)
+    dur := time.Since(begin).Milliseconds()
+    if err != nil {
+        logger.ErrorJ("service_op", map[string]any{"service":"monitoring", "op":"stop", "result":"error", "err": err.Error(), "latency_ms": dur})
+    } else {
+        logger.InfoJ("service_op", map[string]any{"service":"monitoring", "op":"stop", "result":"ok", "latency_ms": dur})
+    }
+    metrics.ObserveSummary("service_op_ms", map[string]string{"service":"monitoring", "op":"stop"}, float64(dur))
+    return err
 }
-
 var _ lifecycle.Service = (*Service)(nil)
 
 // handleMetrics returns current Prom exposition and records unified logs + summary.
