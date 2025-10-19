@@ -8,9 +8,9 @@ import (
     "github.com/zmlAEQ/Aequa-network/pkg/metrics"
 )
 
-type Service struct{}
+type Service struct{ mgr *Manager }
 
-func New() *Service { return &Service{} }
+func New() *Service { return &Service{ mgr: NewManager() } }
 func (s *Service) Name() string { return "p2p" }
 func (s *Service) Start(ctx context.Context) error {
     begin := time.Now()
