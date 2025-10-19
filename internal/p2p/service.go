@@ -14,14 +14,16 @@ func New() *Service { return &Service{} }
 func (s *Service) Name() string { return "p2p" }
 func (s *Service) Start(ctx context.Context) error {
     begin := time.Now()
-    logger.InfoJ("service_op", map[string]any{"service":"p2p", "op":"start", "result":"ok"})
-    metrics.ObserveSummary("service_op_ms", map[string]string{"service":"p2p", "op":"start"}, float64(time.Since(begin).Milliseconds()))
+    dur := time.Since(begin).Milliseconds()
+    logger.InfoJ("service_op", map[string]any{"service":"p2p", "op":"start", "result":"ok", "latency_ms": dur})
+    metrics.ObserveSummary("service_op_ms", map[string]string{"service":"p2p", "op":"start"}, float64(dur))
     return nil
 }
 func (s *Service) Stop(ctx context.Context) error  {
     begin := time.Now()
-    logger.InfoJ("service_op", map[string]any{"service":"p2p", "op":"stop", "result":"ok"})
-    metrics.ObserveSummary("service_op_ms", map[string]string{"service":"p2p", "op":"stop"}, float64(time.Since(begin).Milliseconds()))
+    dur := time.Since(begin).Milliseconds()
+    logger.InfoJ("service_op", map[string]any{"service":"p2p", "op":"stop", "result":"ok", "latency_ms": dur})
+    metrics.ObserveSummary("service_op_ms", map[string]string{"service":"p2p", "op":"stop"}, float64(dur))
     return nil
 }
 
