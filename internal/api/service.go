@@ -27,7 +27,7 @@ func (s *Service) Name() string { return "api" }
 func (s *Service) Start(ctx context.Context) error {
     begin := time.Now()
     mux := http.NewServeMux()
-    mux.HandleFunc("/health", func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(200); _, _ = w.Write([]byte("ok")) })
+    mux.HandleFunc("/health", s.handleHealth) { w.WriteHeader(200); _, _ = w.Write([]byte("ok")) })
     mux.HandleFunc("/v1/duty", s.handleDuty)
     mux.HandleFunc("/", s.proxy)
     s.srv = &http.Server{ Addr: s.addr, Handler: mux }
@@ -191,4 +191,21 @@ func (s *Service) logAPI(w http.ResponseWriter, route string, code int, start ti
     body := errMsg
     if body == "" { body = http.StatusText(code) }
     http.Error(w, body, code)
+}
+
+// handleHealth returns ok and records unified logs and metrics.
+func (s *Service) handleHealth(w http.ResponseWriter, r *http.Request) {
+    start := time.Now()
+    w.WriteHeader(http.StatusOK)
+    _, _ = w.Write([]byte("ok"))
+    dur := time.Since(start)
+    metrics.Inc("api_requests_total", map[string]string{"route":"/health","code":"200"})
+    metrics.ObserveSummary("api_latency_ms", map[string]string{"route":"/health"}, float64(dur.Milliseconds()))
+    logger.InfoJ("api_request", map[string]any{
+        "route": "/health",
+        "code": 200,
+        "latency_ms": dur.Milliseconds(),
+        "result": "ok",
+        "trace_id": traceID(r),
+    })
 }
