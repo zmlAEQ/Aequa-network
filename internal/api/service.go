@@ -49,24 +49,39 @@ var _ lifecycle.Service = (*Service)(nil)
 
 // handleDuty accepts a JSON body and publishes it after basic validation.
 func (s *Service) handleDuty(w http.ResponseWriter, r *http.Request) {
-    if r.Method != http.MethodPost { http.Error(w, "method not allowed", http.StatusMethodNotAllowed); return }
-    if r.Body == nil { http.Error(w, "empty body", http.StatusBadRequest); return }
-    b, err := io.ReadAll(http.MaxBytesReader(w, r.Body, 1<<20))
-    if err != nil { http.Error(w, "read error", http.StatusBadRequest); return }
-    if err := validateDutyJSON(b); err != nil { http.Error(w, err.Error(), http.StatusBadRequest); return }
-
     start := time.Now()
-    if s.onPublish != nil { _ = s.onPublish(trace.WithTraceID(r.Context(), traceID(r)), b) }
+    tid := traceID(r)
+    route := "/v1/duty"
+
+    if r.Method != http.MethodPost {
+        s.logAPI(w, route, http.StatusMethodNotAllowed, start, tid, "error", "method not allowed")
+        return
+    }
+    if r.Body == nil {
+        s.logAPI(w, route, http.StatusBadRequest, start, tid, "error", "empty body")
+        return
+    }
+    b, err := io.ReadAll(http.MaxBytesReader(w, r.Body, 1<<20))
+    if err != nil {
+        s.logAPI(w, route, http.StatusBadRequest, start, tid, "error", "read error")
+        return
+    }
+    if err = validateDutyJSON(b); err != nil {
+        s.logAPI(w, route, http.StatusBadRequest, start, tid, "error", err.Error())
+        return
+    }
+
+    if s.onPublish != nil { _ = s.onPublish(trace.WithTraceID(r.Context(), tid), b) }
     dur := time.Since(start)
-    metrics.Inc("api_requests_total", map[string]string{"route":"/v1/duty","code":"202"})
-    metrics.ObserveSummary("api_latency_ms", map[string]string{"route":"/v1/duty"}, float64(dur.Milliseconds()))
+    metrics.Inc("api_requests_total", map[string]string{"route":route,"code":"202"})
+    metrics.ObserveSummary("api_latency_ms", map[string]string{"route":route}, float64(dur.Milliseconds()))
     logger.InfoJ("api_request", map[string]any{
-        "route": "/v1/duty",
+        "route": route,
         "code":  202,
         "bytes": len(b),
         "latency_ms": dur.Milliseconds(),
         "result": "accepted",
-        "trace_id": traceID(r),
+        "trace_id": tid,
     })
     w.WriteHeader(http.StatusAccepted)
 }
