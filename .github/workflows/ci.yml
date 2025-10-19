@@ -1,4 +1,4 @@
-﻿name: ci
+name: ci
 on:
   push:
     branches: [ main ]
@@ -60,8 +60,8 @@ jobs:
           set -euo pipefail
           total=$(go tool cover -func=coverage.out | awk '/total:/ {print $3}')
           pct=${total%*%}
-          thr_env=${COVERAGE_MIN:-60}
-          thr=$(awk -v e="$thr_env" 'BEGIN{t=e+0; if (t<60) t=60; print t}')
+          thr_env=${COVERAGE_MIN:-70}
+          thr=$(awk -v e="$thr_env" 'BEGIN{t=e+0; if (t<70) t=70; print t}')
           echo "coverage=$pct% (threshold=$thr%)"
           awk -v p=$pct -v t=$thr 'BEGIN{ exit (p+0 < t+0) ? 1 : 0 }'
       - name: Govulncheck
