@@ -23,13 +23,13 @@ type AllowListGate struct{
 }
 
 // NewAllowListGate constructs an allowlist gate from the provided peer IDs.
-func NewAllowListGate(ids ...PeerID) AllowListGate {
+func NewAllowListGate(ids ...PeerID) *AllowListGate {
     m := make(map[PeerID]struct{}, len(ids))
     for _, id := range ids { m[id] = struct{}{} }
-    return AllowListGate{allowed: m}
+    return &AllowListGate{allowed: m}
 }
 
-func (g AllowListGate) Allow(id PeerID) bool {
+func (g *AllowListGate) Allow(id PeerID) bool {
     g.mu.RLock(); _, ok := g.allowed[id]; g.mu.RUnlock()
     return ok
 }
