@@ -99,3 +99,10 @@ var (
     summaries = map[summaryKey]*summaryVal{}
 )
 
+
+// Reset clears all in-memory metrics (counters and summaries). Intended for tests.
+func Reset() {
+    countersMu.Lock(); counters = map[counterKey]*uint64{}; countersMu.Unlock()
+    summaryMu.Lock(); summaries = map[summaryKey]*summaryVal{}; summaryMu.Unlock()
+}
+
