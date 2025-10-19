@@ -58,7 +58,14 @@ func (s *Service) handleDuty(w http.ResponseWriter, r *http.Request) {
     if s.onPublish != nil { _ = s.onPublish(r.Context(), b) }
     dur := time.Since(start)
     metrics.Inc("api_requests_total", map[string]string{"route":"/v1/duty","code":"202"})
-    logger.Info(fmt.Sprintf("duty_accept route=/v1/duty bytes=%d duration_ms=%d", len(b), dur.Milliseconds()))
+    logger.InfoJ("api_request", map[string]any{
+        "route": "/v1/duty",
+        "code":  202,
+        "bytes": len(b),
+        "latency_ms": dur.Milliseconds(),
+        "result": "accepted",
+        "trace_id": traceID(r),
+    })
     w.WriteHeader(http.StatusAccepted)
 }
 
@@ -92,15 +99,33 @@ func (s *Service) proxy(w http.ResponseWriter, r *http.Request) {
     start := time.Now()
     rp.ModifyResponse = func(resp *http.Response) error {
         metrics.Inc("api_requests_total", map[string]string{"route":"proxy","code":fmt.Sprintf("%d", resp.StatusCode)})
-        logger.InfoJ("proxy", map[string]any{"code": resp.StatusCode, "duration_ms": time.Since(start).Milliseconds()})
+        logger.InfoJ("api_request", map[string]any{
+            "route": "proxy",
+            "code": resp.StatusCode,
+            "latency_ms": time.Since(start).Milliseconds(),
+            "result": "ok",
+            "trace_id": traceID(r),
+        })
         return nil
     }
     rp.ErrorHandler = func(w http.ResponseWriter, r *http.Request, e error) {
         metrics.Inc("api_requests_total", map[string]string{"route":"proxy","code":"502"})
-        logger.ErrorJ("proxy_error", map[string]any{"err": e.Error()})
+        logger.ErrorJ("api_request", map[string]any{
+            "route": "proxy",
+            "code": 502,
+            "err":  e.Error(),
+            "result": "error",
+            "trace_id": traceID(r),
+        })
         http.Error(w, "upstream error", http.StatusBadGateway)
     }
     rp.ServeHTTP(w, r)
+}
+
+// traceID returns request trace id from header or generates a simple one.
+func traceID(r *http.Request) string {
+    if t := r.Header.Get("X-Trace-ID"); t != "" { return t }
+    return fmt.Sprintf("%d", time.Now().UnixNano())
 }
 
 
