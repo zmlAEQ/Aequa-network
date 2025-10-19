@@ -49,7 +49,7 @@ func ObserveSummary(name string, labels map[string]string, value float64) {
 }
 
 func DumpProm() string {
-    countersMu.RLock(); defer countersMu.RUnlock()
+    countersMu.RLock()
     var sb strings.Builder
     sb.WriteString("# HELP dvt_up 1\n# TYPE dvt_up gauge\ndvt_up 1\n")
     keys := make([]counterKey, 0, len(counters))
@@ -63,6 +63,26 @@ func DumpProm() string {
             fmt.Fprintf(&sb, "%s{%s} %d\n", k.name, lb.String(), v)
         }
     }
+    countersMu.RUnlock()
+
+    // Dump summaries as _sum and _count pairs
+    summaryMu.RLock()
+    if len(summaries) > 0 {
+        sKeys := make([]summaryKey, 0, len(summaries))
+        for k := range summaries { sKeys = append(sKeys, k) }
+        sort.Slice(sKeys, func(i, j int) bool { if sKeys[i].name != sKeys[j].name { return sKeys[i].name < sKeys[j].name }; return sKeys[i].labels < sKeys[j].labels })
+        for _, k := range sKeys {
+            v := summaries[k]
+            if k.labels == "" {
+                fmt.Fprintf(&sb, "%s_sum %d\n%s_count %d\n", k.name, v.sum, k.name, v.count)
+            } else {
+                parts := strings.Split(k.labels, ","); var lb strings.Builder
+                for i, kv := range parts { if i > 0 { lb.WriteByte(',') }; p := strings.SplitN(kv, "=", 2); fmt.Fprintf(&lb, "%s=\"%s\"", p[0], p[1]) }
+                fmt.Fprintf(&sb, "%s_sum{%s} %d\n%s_count{%s} %d\n", k.name, lb.String(), v.sum, k.name, lb.String(), v.count)
+            }
+        }
+    }
+    summaryMu.RUnlock()
     return sb.String()
 }
 

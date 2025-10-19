@@ -18,7 +18,7 @@ func (s *Service) Name() string { return "monitoring" }
 
 func (s *Service) Start(ctx context.Context) error {
     mux := http.NewServeMux()
-    mux.HandleFunc("/metrics", func(w http.ResponseWriter, _ *http.Request) { _, _ = w.Write([]byte(metrics.DumpProm())) })
+    mux.HandleFunc("/metrics", s.handleMetrics)
     s.srv = &http.Server{ Addr: s.addr, Handler: mux }
     go func() {
         logger.Info(fmt.Sprintf("monitoring on %s\n", s.addr))
@@ -36,4 +36,27 @@ func (s *Service) Stop(ctx context.Context) error {
 }
 
 var _ lifecycle.Service = (*Service)(nil)
+
+// handleMetrics returns current Prom exposition and records unified logs + summary.
+func (s *Service) handleMetrics(w http.ResponseWriter, r *http.Request) {
+    start := time.Now()
+    body := metrics.DumpProm()
+    _, _ = w.Write([]byte(body))
+    dur := time.Since(start)
+    metrics.Inc("api_requests_total", map[string]string{"route":"/metrics","code":"200"})
+    metrics.ObserveSummary("api_latency_ms", map[string]string{"route":"/metrics"}, float64(dur.Milliseconds()))
+    logger.InfoJ("api_request", map[string]any{
+        "route": "/metrics",
+        "code": 200,
+        "latency_ms": dur.Milliseconds(),
+        "result": "ok",
+        "trace_id": traceID(r),
+    })
+}
+
+// traceID returns request trace id from header or generates a simple one.
+func traceID(r *http.Request) string {
+    if t := r.Header.Get("X-Trace-ID"); t != "" { return t }
+    return fmt.Sprintf("%d", time.Now().UnixNano())
+}
 
