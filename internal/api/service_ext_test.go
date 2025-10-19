@@ -92,3 +92,16 @@ func TestMetrics_ProxyError_Increments(t *testing.T) {
         t.Fatalf("expected metrics increment for proxy 502, got %q", dump)
     }
 }
+type errBody struct{}
+func (errBody) Read(p []byte) (int, error) { return 0, fmt.Errorf("boom") }
+func (errBody) Close() error { return nil }
+
+func TestHandleDuty_ReadError(t *testing.T) {
+    s := &Service{}
+    rr := httptest.NewRecorder()
+    req := httptest.NewRequest(http.MethodPost, "/v1/duty", errBody{})
+    s.handleDuty(rr, req)
+    if rr.Code != http.StatusBadRequest {
+        t.Fatalf("want 400, got %d", rr.Code)
+    }
+}
