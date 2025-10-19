@@ -16,7 +16,8 @@ type Service struct{ addr string; srv *http.Server }
 func New(addr string) *Service { return &Service{addr: addr} }
 func (s *Service) Name() string { return "monitoring" }
 
-func (s *Service) Start(ctx context.Context) error {\r\n    begin := time.Now()
+func (s *Service) Start(ctx context.Context) error {
+    begin := time.Now()
     mux := http.NewServeMux()
     mux.HandleFunc("/metrics", s.handleMetrics)
     s.srv = &http.Server{ Addr: s.addr, Handler: mux }
