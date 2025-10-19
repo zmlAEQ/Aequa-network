@@ -1,4 +1,4 @@
-package bus
+﻿package bus
 
 import (
 	"context"
@@ -11,10 +11,11 @@ const (
 )
 
 type Event struct {
-	Kind   Kind
-	Height uint64
-	Round  uint64
-	Body   any
+	Kind    Kind
+	Height  uint64
+	Round   uint64
+	Body    any
+	TraceID string
 }
 
 type Subscriber chan Event
@@ -33,4 +34,3 @@ func (b *Bus) Publish(_ context.Context, ev Event) {
 }
 
 func (b *Bus) Subscribe() Subscriber { return b.pub }
-
