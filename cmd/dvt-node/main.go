@@ -1,4 +1,4 @@
-package main
+﻿package main
 
 import (
     "context"
@@ -14,6 +14,7 @@ import (
     "github.com/zmlAEQ/Aequa-network/pkg/bus"
     "github.com/zmlAEQ/Aequa-network/pkg/lifecycle"
     "github.com/zmlAEQ/Aequa-network/pkg/logger"
+    "github.com/zmlAEQ/Aequa-network/pkg/trace"
 )
 
 func main() {
@@ -32,7 +33,8 @@ func main() {
 
     b := bus.New(256)
     publish := func(ctx context.Context, payload []byte) error {
-        b.Publish(ctx, bus.Event{Kind: bus.KindDuty, Body: payload})
+        tid, _ := trace.FromContext(ctx)
+        b.Publish(ctx, bus.Event{Kind: bus.KindDuty, Body: payload, TraceID: tid})
         return nil
     }
 
@@ -46,4 +48,3 @@ func main() {
     <-ctx.Done()
     _ = m.StopAll(context.Background())
 }
-

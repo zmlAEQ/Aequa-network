@@ -1,4 +1,4 @@
-package api
+﻿package api
 
 import (
     "context"
@@ -13,6 +13,7 @@ import (
     "github.com/zmlAEQ/Aequa-network/pkg/lifecycle"
     "github.com/zmlAEQ/Aequa-network/pkg/logger"
     "github.com/zmlAEQ/Aequa-network/pkg/metrics"
+    "github.com/zmlAEQ/Aequa-network/pkg/trace"
 )
 
 type Service struct{ addr string; srv *http.Server; onPublish func(ctx context.Context, payload []byte) error; upstream string }
@@ -55,7 +56,7 @@ func (s *Service) handleDuty(w http.ResponseWriter, r *http.Request) {
     if err := validateDutyJSON(b); err != nil { http.Error(w, err.Error(), http.StatusBadRequest); return }
 
     start := time.Now()
-    if s.onPublish != nil { _ = s.onPublish(r.Context(), b) }
+    if s.onPublish != nil { _ = s.onPublish(trace.WithTraceID(r.Context(), traceID(r)), b) }
     dur := time.Since(start)
     metrics.Inc("api_requests_total", map[string]string{"route":"/v1/duty","code":"202"})
     logger.InfoJ("api_request", map[string]any{
@@ -127,6 +128,9 @@ func traceID(r *http.Request) string {
     if t := r.Header.Get("X-Trace-ID"); t != "" { return t }
     return fmt.Sprintf("%d", time.Now().UnixNano())
 }
+
+
+
 
 
 
