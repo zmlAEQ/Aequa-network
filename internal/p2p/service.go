@@ -1,4 +1,4 @@
-package p2p
+﻿package p2p
 
 import (
     "context"
@@ -17,7 +17,7 @@ type Service struct{
     hook  Hook
 }
 
-func New() *Service { return &Service{ mgr: NewManager(), gate: AllowAllGate{}, rman: NewResourceManager(DefaultResourceLimits()), hook: NopHook{} } }
+func New() *Service { return &Service{ mgr: NewManager(), gate: AllowAllGate{}, rman: NewResourceManager(DefaultResourceLimits()), hook: LogHook{} } }
 func (s *Service) Name() string { return "p2p" }
 func (s *Service) Start(ctx context.Context) error {
     begin := time.Now()
