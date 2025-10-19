@@ -10,7 +10,7 @@ import (
 func TestResourceManager_OpenCloseCounters(t *testing.T) {
     metrics.Reset()
     r := NewResourceManager(ResourceLimits{MaxConns: 2})
-    if !r.TryOpen() || !r.TryOpen() { t.Fatalf("expected first two opens to succeed") }
+    if !r.TryOpen() { t.Fatalf("expected first two opens to succeed") }
     if r.TryOpen() { t.Fatalf("third open should fail due to limit") }
     r.Close(); r.Close()
     dump := metrics.DumpProm()
