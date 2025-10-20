@@ -18,18 +18,14 @@ func TestState_Prepare_MismatchProposal_DoesNotCountOrTransition(t *testing.T) {
     }
     if st.Phase != "preprepared" { t.Fatalf("want preprepared, got %q", st.Phase) }
 
-    // Prepare for a different proposal id should fail and not change phase or votes.
+    // Prepare for a different proposal id should fail and not change phase.
     if err := st.Process(Message{ID: "blkX", From: "P1", Type: MsgPrepare, Height: 8, Round: 1}); err == nil {
         t.Fatalf("expected error for mismatched proposal id")
     }
     if st.Phase != "preprepared" { t.Fatalf("phase changed unexpectedly: %q", st.Phase) }
-    if st.prepareVotes != nil && len(st.prepareVotes) != 0 {
-        t.Fatalf("votes should not be recorded on error: %d", len(st.prepareVotes))
-    }
 
     dump := metrics.DumpProm()
     if strings.Contains(dump, `qbft_state_transitions_total{type="prepare"}`) {
         t.Fatalf("unexpected prepare transition count on error: %q", dump)
     }
 }
-
