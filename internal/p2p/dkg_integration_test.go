@@ -5,7 +5,6 @@ import (
     "strings"
     "testing"
 
-    "github.com/zmlAEQ/Aequa-network/internal/dkg"
     "github.com/zmlAEQ/Aequa-network/pkg/metrics"
 )
 
