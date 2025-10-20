@@ -70,6 +70,20 @@ jobs:
           go-version-input: '1.24'
           work-dir: .
 
+  qbft-tests:
+    # Non-required visibility job to exercise qbft package tests
+    runs-on: ubuntu-latest
+    needs: [lint]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.24'
+      - name: Run qbft package tests (non-required)
+        run: |
+          set -euo pipefail
+          go test ./internal/consensus/qbft -count=1
+
   security-snyk:
     runs-on: ubuntu-latest
     needs: [build-test]
