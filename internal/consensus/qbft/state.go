@@ -1,6 +1,7 @@
 package qbft
 
 import (
+    "fmt"
     "github.com/zmlAEQ/Aequa-network/pkg/logger"
     "github.com/zmlAEQ/Aequa-network/pkg/metrics"
 )
@@ -10,7 +11,8 @@ import (
 type State struct {
     Height uint64
     Round  uint64
-    Phase  string // e.g., "idle|preprepare|prepare|commit" (placeholder)
+    Phase  string // e.g., "idle|preprepared|prepare|commit" (placeholder)
+    Leader string // placeholder leader id for current round
 }
 
 // Processor defines the minimal interface for driving state transitions.
@@ -27,7 +29,20 @@ func (s *State) Process(msg Message) error {
     s.Round = msg.Round
     switch msg.Type {
     case MsgPreprepare:
-        s.Phase = "preprepare"
+        // Placeholder leader validation: if Leader is set, only accept from that id
+        if s.Leader != "" && msg.From != s.Leader {
+            logger.ErrorJ("qbft_state", map[string]any{
+                "op":        "transition",
+                "event_type": string(msg.Type),
+                "height":    s.Height,
+                "round":     s.Round,
+                "reason":    "unauthorized_leader",
+                "from":      msg.From,
+                "expect":    s.Leader,
+            })
+            return fmt.Errorf("unauthorized leader")
+        }
+        s.Phase = "preprepared"
     case MsgPrepare:
         s.Phase = "prepare"
     case MsgCommit:
@@ -38,13 +53,12 @@ func (s *State) Process(msg Message) error {
 
     // Observability: one log + one counter per processed message.
     logger.InfoJ("qbft_state", map[string]any{
-        "op": "transition",
+        "op":        "transition",
         "event_type": string(msg.Type),
-        "height": s.Height,
-        "round": s.Round,
-        "phase": s.Phase,
+        "height":    s.Height,
+        "round":     s.Round,
+        "phase":     s.Phase,
     })
     metrics.Inc("qbft_state_transitions_total", map[string]string{"type": string(msg.Type)})
     return nil
 }
-
