@@ -28,9 +28,23 @@ func TestState_Process_IncrementsCounterAndUpdatesCoords(t *testing.T) {
 }
 
 func TestState_Process_PhaseMapping(t *testing.T) {
-    st := &State{}
-    _ = st.Process(Message{Type: MsgPreprepare})
+    st := &State{Leader: "L"}
+    // preprepare establishes proposal context
+    if err := st.Process(Message{ID:"blkM", From:"L", Type: MsgPreprepare, Round:0}); err != nil {
+        t.Fatalf("preprepare: %v", err)
+    }
     if st.Phase != "preprepared" { t.Fatalf("phase: %s", st.Phase) }
-    _ = st.Process(Message{Type: MsgCommit})
+    // two prepares reach prepared
+    if err := st.Process(Message{ID:"blkM", From:"P1", Type: MsgPrepare, Round:1}); err != nil {
+        t.Fatalf("prepare1: %v", err)
+    }
+    if err := st.Process(Message{ID:"blkM", From:"P2", Type: MsgPrepare, Round:1}); err != nil {
+        t.Fatalf("prepare2: %v", err)
+    }
+    if st.Phase != "prepared" { t.Fatalf("phase: %s", st.Phase) }
+    // commit advances to commit
+    if err := st.Process(Message{ID:"blkM", From:"C1", Type: MsgCommit, Round:1}); err != nil {
+        t.Fatalf("commit: %v", err)
+    }
     if st.Phase != "commit" { t.Fatalf("phase: %s", st.Phase) }
 }
