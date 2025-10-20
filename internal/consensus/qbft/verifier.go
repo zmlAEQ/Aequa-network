@@ -112,6 +112,24 @@ func (v *BasicVerifier) Verify(msg Message) error {
         logger.ErrorJ("qbft_verify", map[string]any{"result":"replay", "id": msg.ID, "type": string(msg.Type), "window": v.replayWindow})
         return fmt.Errorf("replay")
     }
+
+    // context semantics (placeholder, non-breaking):
+    // - preprepare must have round == 0 (added earlier)
+    if msg.Type == MsgPreprepare {
+        if msg.Round != 0 {
+            metrics.Inc("qbft_msg_verified_total", map[string]string{"result":"error"})
+            logger.ErrorJ("qbft_verify", map[string]any{"result":"error", "reason":"round_semantic", "type": string(msg.Type), "round": msg.Round})
+            return fmt.Errorf("invalid round for preprepare")
+        }
+    }
+    // - prepare/commit must have round >= 1
+    if msg.Type == MsgPrepare || msg.Type == MsgCommit {
+        if msg.Round < 1 {
+            metrics.Inc("qbft_msg_verified_total", map[string]string{"result":"error"})
+            logger.ErrorJ("qbft_verify", map[string]any{"result":"error", "reason":"round_semantic", "type": string(msg.Type), "round": msg.Round})
+            return fmt.Errorf("invalid round for %s", msg.Type)
+        }
+    }
     // anti-replay
     if v.replay != nil && v.replay.Seen(msg.ID) {
         metrics.Inc("qbft_msg_verified_total", map[string]string{"result":"replay"})
