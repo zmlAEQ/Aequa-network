@@ -223,6 +223,89 @@ func TestBasicVerifier_Commit_RoundOne_OK(t *testing.T) {
     }
 }
 
+// ---- Priority and precedence tests ----
+
+// Global minHeight vs type-scoped minHeight: stricter threshold must prevail.
+func TestBasicVerifier_MinHeight_Priority_TypeStricter(t *testing.T) {
+    metrics.Reset()
+    v := NewBasicVerifier()
+    v.SetMinHeight(50)
+    v.SetTypeMinHeight(MsgPrepare, 100)
+    // height 80 is >= global 50 but < type 100: should be old due to type rule
+    if err := v.Verify(Message{ID: "prio-h-type", From: "p", Type: MsgPrepare, Height: 80, Round: 1}); err == nil {
+        t.Fatalf("want old height due to stricter type minHeight")
+    }
+    dump := metrics.DumpProm()
+    if !strings.Contains(dump, `qbft_msg_verified_total{result="old"} 1`) {
+        t.Fatalf("want old=1, got %q", dump)
+    }
+}
+
+func TestBasicVerifier_MinHeight_Priority_GlobalStricter(t *testing.T) {
+    metrics.Reset()
+    v := NewBasicVerifier()
+    v.SetMinHeight(120)
+    v.SetTypeMinHeight(MsgPrepare, 100)
+    // height 110 is >= type 100 but < global 120: should be old due to global rule
+    if err := v.Verify(Message{ID: "prio-h-global", From: "p", Type: MsgPrepare, Height: 110, Round: 1}); err == nil {
+        t.Fatalf("want old height due to stricter global minHeight")
+    }
+}
+
+// Global roundWindow vs type-scoped roundMax: stricter cap must prevail.
+func TestBasicVerifier_RoundWindow_Priority_TypeStricter(t *testing.T) {
+    metrics.Reset()
+    v := NewBasicVerifier()
+    v.SetRoundWindow(5)
+    v.SetTypeRoundMax(MsgCommit, 3)
+    if err := v.Verify(Message{ID: "prio-r-type", From: "p", Type: MsgCommit, Round: 4}); err == nil {
+        t.Fatalf("want type-scoped round_oob when type is stricter")
+    }
+    dump := metrics.DumpProm()
+    if !strings.Contains(dump, `qbft_msg_verified_total{result="round_oob"} 1`) {
+        t.Fatalf("want round_oob=1, got %q", dump)
+    }
+}
+
+func TestBasicVerifier_RoundWindow_Priority_GlobalStricter(t *testing.T) {
+    metrics.Reset()
+    v := NewBasicVerifier()
+    v.SetRoundWindow(3)
+    v.SetTypeRoundMax(MsgCommit, 5)
+    if err := v.Verify(Message{ID: "prio-r-global", From: "p", Type: MsgCommit, Round: 4}); err == nil {
+        t.Fatalf("want global round_oob when global is stricter")
+    }
+}
+
+// Replay precedence: when replayWindow>0, use height-windowed; when ==0, use id-level.
+func TestBasicVerifier_Replay_Preference_Windowed(t *testing.T) {
+    metrics.Reset()
+    v := NewBasicVerifier(); v.SetReplayWindow(2)
+    // first ok
+    if err := v.Verify(Message{ID: "rw-pref", From: "p", Type: MsgPrepare, Height: 100, Round: 1}); err != nil {
+        t.Fatalf("first msg: %v", err)
+    }
+    // within window → replay
+    if err := v.Verify(Message{ID: "rw-pref", From: "p", Type: MsgPrepare, Height: 101, Round: 1}); err == nil {
+        t.Fatalf("want replay within window")
+    }
+    // outside window → ok
+    if err := v.Verify(Message{ID: "rw-pref", From: "p", Type: MsgPrepare, Height: 103, Round: 1}); err != nil {
+        t.Fatalf("outside window should pass: %v", err)
+    }
+}
+
+func TestBasicVerifier_Replay_Preference_IdLevel(t *testing.T) {
+    metrics.Reset()
+    v := NewBasicVerifier(); v.SetReplayWindow(0)
+    if err := v.Verify(Message{ID: "id-pref", From: "p", Type: MsgCommit, Round: 1}); err != nil {
+        t.Fatalf("first commit should pass: %v", err)
+    }
+    if err := v.Verify(Message{ID: "id-pref", From: "p", Type: MsgCommit, Round: 1}); err == nil {
+        t.Fatalf("want id-level replay on second commit")
+    }
+}
+
 func TestBasicVerifier_Commit_OldHeightReject(t *testing.T) {
     metrics.Reset()
     v := NewBasicVerifier(); v.SetMinHeight(10)
