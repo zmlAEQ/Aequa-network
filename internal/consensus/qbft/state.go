@@ -132,7 +132,7 @@ func (s *State) Process(msg Message) error {
     }
 
 END:
-    // Observability: count/log only on successful state transition (changed=true).
+    // Observability: log always; count all successfully processed (non-error) messages.
     if changed {
         logger.InfoJ("qbft_state", map[string]any{
             "op":        "transition",
@@ -141,9 +141,7 @@ END:
             "round":     s.Round,
             "phase":     s.Phase,
         })
-        metrics.Inc("qbft_state_transitions_total", map[string]string{"type": string(msg.Type)})
     } else {
-        // Audit no-op (duplicate/under-threshold) without incrementing transition counters.
         logger.InfoJ("qbft_state", map[string]any{
             "op":        "transition",
             "event_type": string(msg.Type),
@@ -153,5 +151,6 @@ END:
             "note":      "noop",
         })
     }
+    metrics.Inc("qbft_state_transitions_total", map[string]string{"type": string(msg.Type)})
     return nil
 }
