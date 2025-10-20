@@ -222,3 +222,47 @@ func TestBasicVerifier_Commit_RoundOne_OK(t *testing.T) {
         t.Fatalf("want ok count for commit, got %q", dump)
     }
 }
+
+func TestBasicVerifier_Commit_OldHeightReject(t *testing.T) {
+    metrics.Reset()
+    v := NewBasicVerifier(); v.SetMinHeight(10)
+    if err := v.Verify(Message{ID:"hc9", From:"p", Type:MsgCommit, Height:9, Round:1}); err == nil {
+        t.Fatalf("want old height error for commit")
+    }
+    dump := metrics.DumpProm()
+    if !strings.Contains(dump, `qbft_msg_verified_total{result="old"} 1`) {
+        t.Fatalf("want old=1, got %q", dump)
+    }
+}
+
+func TestBasicVerifier_Commit_MinHeightBoundaryOK(t *testing.T) {
+    metrics.Reset()
+    v := NewBasicVerifier(); v.SetMinHeight(10)
+    if err := v.Verify(Message{ID:"hc10", From:"p", Type:MsgCommit, Height:10, Round:1}); err != nil {
+        t.Fatalf("boundary height should pass for commit: %v", err)
+    }
+}
+
+func TestBasicVerifier_Commit_TypeMinHeight_Old(t *testing.T) {
+    metrics.Reset()
+    v := NewBasicVerifier(); v.SetTypeMinHeight(MsgCommit, 100)
+    if err := v.Verify(Message{ID:"tc-old", From:"p", Type:MsgCommit, Height:99, Round:1}); err == nil {
+        t.Fatalf("want type-scoped old for commit")
+    }
+    dump := metrics.DumpProm()
+    if !strings.Contains(dump, `qbft_msg_verified_total{result="old"} 1`) {
+        t.Fatalf("want old=1, got %q", dump)
+    }
+}
+
+func TestBasicVerifier_Commit_SenderUnauthorized(t *testing.T) {
+    metrics.Reset()
+    v := NewBasicVerifier(); v.SetAllowed("p")
+    if err := v.Verify(Message{ID:"uc1", From:"q", Type:MsgCommit, Round:1}); err == nil {
+        t.Fatalf("want unauthorized for commit from q")
+    }
+    dump := metrics.DumpProm()
+    if !strings.Contains(dump, `qbft_msg_verified_total{result="unauthorized"} 1`) {
+        t.Fatalf("want unauthorized=1, got %q", dump)
+    }
+}
