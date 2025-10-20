@@ -11,8 +11,13 @@ import (
 type State struct {
     Height uint64
     Round  uint64
-    Phase  string // e.g., "idle|preprepared|prepare|commit" (placeholder)
+    Phase  string // e.g., "idle|preprepared|prepared|commit" (placeholder)
     Leader string // placeholder leader id for current round
+
+    // Minimal aggregation placeholders for M3
+    proposalID   string
+    prepareVotes map[string]struct{} // by From
+    commitVotes  map[string]struct{} // by From
 }
 
 // Processor defines the minimal interface for driving state transitions.
@@ -27,6 +32,7 @@ func (s *State) Process(msg Message) error {
     // Lightweight, non-authoritative update of coordinates for visibility.
     s.Height = msg.Height
     s.Round = msg.Round
+    var ok bool
     switch msg.Type {
     case MsgPreprepare:
         // Placeholder leader validation: if Leader is set, only accept from that id
@@ -43,15 +49,79 @@ func (s *State) Process(msg Message) error {
             return fmt.Errorf("unauthorized leader")
         }
         s.Phase = "preprepared"
+        s.proposalID = msg.ID
+        s.prepareVotes = make(map[string]struct{})
+        s.commitVotes = make(map[string]struct{})
     case MsgPrepare:
-        s.Phase = "prepare"
+        // Only accept prepare for current proposal after preprepared.
+        if s.Phase != "preprepared" {
+            logger.ErrorJ("qbft_state", map[string]any{
+                "op":        "transition",
+                "event_type": string(msg.Type),
+                "height":    s.Height,
+                "round":     s.Round,
+                "reason":    "not_preprepared",
+            })
+            return fmt.Errorf("prepare before preprepared")
+        }
+        if msg.ID != s.proposalID {
+            logger.ErrorJ("qbft_state", map[string]any{
+                "op":        "transition",
+                "event_type": string(msg.Type),
+                "height":    s.Height,
+                "round":     s.Round,
+                "reason":    "proposal_mismatch",
+                "got":       msg.ID,
+                "expect":    s.proposalID,
+            })
+            return fmt.Errorf("proposal mismatch")
+        }
+        if _, ok = s.prepareVotes[msg.From]; ok {
+            // Duplicate prepare is a no-op.
+            break
+        }
+        s.prepareVotes[msg.From] = struct{}{}
+        if len(s.prepareVotes) >= 2 { // minimal threshold
+            s.Phase = "prepared"
+        }
     case MsgCommit:
-        s.Phase = "commit"
+        // Commit only allowed after prepared and for the same proposal id.
+        if s.Phase != "prepared" {
+            logger.ErrorJ("qbft_state", map[string]any{
+                "op":        "transition",
+                "event_type": string(msg.Type),
+                "height":    s.Height,
+                "round":     s.Round,
+                "reason":    "not_prepared",
+            })
+            return fmt.Errorf("commit before prepared")
+        }
+        if msg.ID != s.proposalID {
+            logger.ErrorJ("qbft_state", map[string]any{
+                "op":        "transition",
+                "event_type": string(msg.Type),
+                "height":    s.Height,
+                "round":     s.Round,
+                "reason":    "proposal_mismatch",
+                "got":       msg.ID,
+                "expect":    s.proposalID,
+            })
+            return fmt.Errorf("proposal mismatch")
+        }
+        if _, ok = s.commitVotes[msg.From]; ok {
+            // Duplicate commit is a no-op.
+            break
+        }
+        s.commitVotes[msg.From] = struct{}{}
+        // Minimal rule: first distinct commit advances to commit phase.
+        if len(s.commitVotes) >= 1 {
+            s.Phase = "commit"
+        }
     default:
         // Keep previous phase for unknown types; still record observability.
     }
 
-    // Observability: one log + one counter per processed message.
+    // Observability: one log + one counter per successful processed message.
     logger.InfoJ("qbft_state", map[string]any{
         "op":        "transition",
         "event_type": string(msg.Type),
