@@ -5,6 +5,7 @@ import (
     "fmt"
     "time"
 
+    "github.com/zmlAEQ/Aequa-network/internal/dkg"
     "github.com/zmlAEQ/Aequa-network/pkg/lifecycle"
     "github.com/zmlAEQ/Aequa-network/pkg/logger"
     "github.com/zmlAEQ/Aequa-network/pkg/metrics"
@@ -15,15 +16,26 @@ type Service struct{
     gate  Gate
     rman  *ResourceManager
     hook  Hook
+    dkgv  dkg.Verifier
 }
 
-func New() *Service { return &Service{ mgr: NewManager(), gate: AllowAllGate{}, rman: NewResourceManager(DefaultResourceLimits()), hook: LogHook{} } }
+func New() *Service { return &Service{ mgr: NewManager(), gate: AllowAllGate{}, rman: NewResourceManager(DefaultResourceLimits()), hook: LogHook{}, dkgv: dkg.NoopVerifier{} } }
 func (s *Service) Name() string { return "p2p" }
 func (s *Service) Start(ctx context.Context) error {
     begin := time.Now()
     dur := time.Since(begin).Milliseconds()
     logger.InfoJ("service_op", map[string]any{"service":"p2p", "op":"start", "result":"ok", "latency_ms": dur})
     metrics.ObserveSummary("service_op_ms", map[string]string{"service":"p2p", "op":"start"}, float64(dur))
+    // DKG/cluster-lock verification (audit + metrics)
+    if s.dkgv != nil {
+        if err := s.dkgv.VerifyCluster(); err != nil {
+            logger.ErrorJ("p2p_dkg_cluster", map[string]any{"result":"error", "err": err.Error()})
+            metrics.Inc("p2p_dkg_cluster_checks_total", map[string]string{"result":"error"})
+        } else {
+            logger.InfoJ("p2p_dkg_cluster", map[string]any{"result":"ok"})
+            metrics.Inc("p2p_dkg_cluster_checks_total", map[string]string{"result":"ok"})
+        }
+    }
     return nil
 }
 func (s *Service) Stop(ctx context.Context) error  {
@@ -42,8 +54,11 @@ func NewWithOpts(mgr *Manager, gate Gate, rman *ResourceManager, hook Hook) *Ser
     if gate == nil { gate = AllowAllGate{} }
     if rman == nil { rman = NewResourceManager(DefaultResourceLimits()) }
     if hook == nil { hook = NopHook{} }
-    return &Service{mgr: mgr, gate: gate, rman: rman, hook: hook}
+    return &Service{mgr: mgr, gate: gate, rman: rman, hook: hook, dkgv: dkg.NoopVerifier{}}
 }
+
+// SetDKG allows tests or wiring to inject a DKG/cluster-lock verifier.
+func (s *Service) SetDKG(v dkg.Verifier) { s.dkgv = v }
 
 // Connect tries to admit and register a peer according to gate and resources.
 func (s *Service) Connect(id PeerID) error {
@@ -61,6 +76,12 @@ func (s *Service) Connect(id PeerID) error {
             metrics.Inc("p2p_conn_attempts_total", labels)
             return fmt.Errorf("peer denied")
         }
+    }
+    if s.dkgv != nil && !s.dkgv.AllowPeer(string(id)) {
+        labels["result"] = "dkg_denied"
+        metrics.Inc("p2p_conn_attempts_total", labels)
+        logger.ErrorJ("p2p_dkg_gate", map[string]any{"peer_id": string(id), "result":"denied"})
+        return fmt.Errorf("dkg denied")
     }
     if !s.rman.TryOpen() {
         labels["result"] = "limited"
