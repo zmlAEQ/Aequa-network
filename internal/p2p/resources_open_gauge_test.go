@@ -12,8 +12,8 @@ func TestResourceManager_OpenGaugeReflectsCurrent(t *testing.T) {
     r := NewResourceManager(ResourceLimits{MaxConns: 3})
     if !r.TryOpen() { t.Fatalf("first open should succeed") }
     dump := metrics.DumpProm()
-    if !strings.Contains(dump, "p2p_conns_open 2") {
-        t.Fatalf("want p2p_conns_open 2, got %q", dump)
+    if !strings.Contains(dump, "p2p_conns_open 1") {
+        t.Fatalf("want p2p_conns_open 1, got %q", dump)
     }
     r.Close(); r.Close()
     dump2 := metrics.DumpProm()
