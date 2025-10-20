@@ -4,7 +4,7 @@ import "testing"
 
 // In a simplified model, after reaching a prepare threshold, phase moves to prepared.
 func TestState_Prepared_AfterThreshold(t *testing.T) {
-    st := &State{Leader: "L", PrepareThreshold: 2}
+    st := &State{Leader: "L", }
     // Accept preprepare from leader and establish proposal id
     if err := st.Process(Message{ID: "blk1", From: "L", Type: MsgPreprepare, Height: 5, Round: 0}); err != nil {
         t.Fatalf("preprepare: %v", err)
