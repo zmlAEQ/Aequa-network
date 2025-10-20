@@ -12,7 +12,7 @@ import (
     "github.com/zmlAEQ/Aequa-network/internal/state"
 )
 
-type Service struct{ sub bus.Subscriber; v qbft.Verifier; store state.Store }
+type Service struct{ sub bus.Subscriber; v qbft.Verifier; store state.Store; st qbft.Processor }
 
 func New() *Service { return &Service{} }
 func NewWithSub(sub bus.Subscriber) *Service { return &Service{sub: sub} }
@@ -24,6 +24,9 @@ func (s *Service) SetVerifier(v qbft.Verifier) { s.v = v }
 // SetStore allows tests/wiring to inject a StateDB store. If nil, a MemoryStore is instantiated on start.
 func (s *Service) SetStore(st state.Store) { s.store = st }
 
+// SetProcessor allows tests/wiring to inject a qbft state processor. If nil, a default state is created on start.
+func (s *Service) SetProcessor(p qbft.Processor) { s.st = p }
+
 func (s *Service) Start(ctx context.Context) error {
     if s.sub == nil {
         logger.Info("consensus start (stub)")
@@ -31,6 +34,7 @@ func (s *Service) Start(ctx context.Context) error {
     }
     if s.v == nil { s.v = qbft.NewBasicVerifier() }
     if s.store == nil { s.store = state.NewMemoryStore() }
+    if s.st == nil { s.st = &qbft.State{} }
     if ls, err := s.store.LoadLastState(ctx); err != nil {
         logger.InfoJ("consensus_state", map[string]any{"op":"load", "result":"miss", "err": err.Error()})
     } else {
@@ -48,14 +52,15 @@ func (s *Service) Start(ctx context.Context) error {
                 logger.InfoJ("consensus_recv", map[string]any{"kind": string(ev.Kind), "trace_id": ev.TraceID, "result": "recv", "latency_ms": dur.Milliseconds()})
                 metrics.Inc("consensus_events_total", map[string]string{"kind": string(ev.Kind)})
                 metrics.ObserveSummary("consensus_proc_ms", map[string]string{"kind": string(ev.Kind)}, float64(dur.Milliseconds()))
-                // Map event to qbft message via adapter (stub mapping only)
+                // Map event to qbft message via adapter
                 msg := MapEventToQBFT(ev)
-                _ = s.v.Verify(msg)
-                // Persist last state (stub): log only; ignore control flow
-                if err := s.store.SaveLastState(ctx, state.LastState{Height: msg.Height, Round: msg.Round}); err != nil {
-                    logger.ErrorJ("consensus_state", map[string]any{"op":"save", "result":"error", "err": err.Error()})
-                } else {
-                    logger.InfoJ("consensus_state", map[string]any{"op":"save", "result":"ok", "height": msg.Height, "round": msg.Round})
+                if err := s.v.Verify(msg); err == nil {
+                    _ = s.st.Process(msg)
+                    if err2 := s.store.SaveLastState(ctx, state.LastState{Height: msg.Height, Round: msg.Round}); err2 != nil {
+                        logger.ErrorJ("consensus_state", map[string]any{"op":"save", "result":"error", "err": err2.Error()})
+                    } else {
+                        logger.InfoJ("consensus_state", map[string]any{"op":"save", "result":"ok", "height": msg.Height, "round": msg.Round})
+                    }
                 }
             case <-ctx.Done():
                 return
