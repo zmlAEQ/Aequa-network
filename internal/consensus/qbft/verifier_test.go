@@ -98,6 +98,47 @@ func TestBasicVerifier_RoundWindow(t *testing.T) {
     }
 }
 
+func TestBasicVerifier_TypeMinHeight_Old(t *testing.T) {
+    metrics.Reset()
+    v := NewBasicVerifier(); v.SetTypeMinHeight(MsgPrepare, 100)
+    // below type-scoped min should be rejected
+    if err := v.Verify(Message{ID:"tmin-old", From:"p", Type:MsgPrepare, Height:99, Round:1}); err == nil {
+        t.Fatalf("want type-scoped old")
+    }
+    dump := metrics.DumpProm()
+    if !strings.Contains(dump, `qbft_msg_verified_total{result="old"} 1`) {
+        t.Fatalf("want old=1, got %q", dump)
+    }
+}
+
+func TestBasicVerifier_TypeMinHeight_BoundaryOK(t *testing.T) {
+    metrics.Reset()
+    v := NewBasicVerifier(); v.SetTypeMinHeight(MsgPrepare, 100)
+    if err := v.Verify(Message{ID:"tmin-ok", From:"p", Type:MsgPrepare, Height:100, Round:1}); err != nil {
+        t.Fatalf("boundary should pass: %v", err)
+    }
+}
+
+func TestBasicVerifier_TypeRoundMax_OOB(t *testing.T) {
+    metrics.Reset()
+    v := NewBasicVerifier(); v.SetTypeRoundMax(MsgCommit, 3)
+    if err := v.Verify(Message{ID:"tmax-oob", From:"p", Type:MsgCommit, Round:4}); err == nil {
+        t.Fatalf("want type-scoped round_oob")
+    }
+    dump := metrics.DumpProm()
+    if !strings.Contains(dump, `qbft_msg_verified_total{result="round_oob"} 1`) {
+        t.Fatalf("want round_oob=1, got %q", dump)
+    }
+}
+
+func TestBasicVerifier_TypeRoundMax_BoundaryOK(t *testing.T) {
+    metrics.Reset()
+    v := NewBasicVerifier(); v.SetTypeRoundMax(MsgCommit, 3)
+    if err := v.Verify(Message{ID:"tmax-ok", From:"p", Type:MsgCommit, Round:3}); err != nil {
+        t.Fatalf("boundary should pass: %v", err)
+    }
+}
+
 func TestBasicVerifier_SenderUnauthorized(t *testing.T) {
     metrics.Reset()
     v := NewBasicVerifier(); v.SetAllowed("p")
