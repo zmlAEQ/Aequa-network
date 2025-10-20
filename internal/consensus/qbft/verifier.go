@@ -106,14 +106,6 @@ func validType(t Type) bool {
 
 func (v *BasicVerifier) Verify(msg Message) error {
     labels := map[string]string{"type": string(msg.Type)}
-    // Early id-level anti-replay when no height window is configured.
-    if v.replay != nil && v.replayWindow == 0 {
-        if v.replay.Seen(msg.ID) {
-            metrics.Inc("qbft_msg_verified_total", map[string]string{"result":"replay"})
-            logger.ErrorJ("qbft_verify", map[string]any{"result":"replay", "id": msg.ID, "type": string(msg.Type)})
-            return fmt.Errorf("replay")
-        }
-    }
     // structural checks
     if msg.ID == "" || msg.From == "" || !validType(msg.Type) {
         metrics.Inc("qbft_msg_verified_total", map[string]string{"result":"error"})
@@ -154,11 +146,21 @@ func (v *BasicVerifier) Verify(msg Message) error {
         logger.ErrorJ("qbft_verify", map[string]any{"result":"round_oob", "round": msg.Round, "max": v.roundWindow, "type": string(msg.Type)})
         return fmt.Errorf("round out of bound")
     }
-    // windowed replay (same id within height window)
-    if v.replay != nil && v.replayWindow > 0 && v.replay.SeenWithin(msg.ID, msg.Height, v.replayWindow) {
-        metrics.Inc("qbft_msg_verified_total", map[string]string{"result":"replay"})
-        logger.ErrorJ("qbft_verify", map[string]any{"result":"replay", "id": msg.ID, "type": string(msg.Type), "window": v.replayWindow})
-        return fmt.Errorf("replay")
+    // anti-replay: prefer height-windowed replay if configured; otherwise id-level replay
+    if v.replay != nil {
+        if v.replayWindow > 0 {
+            if v.replay.SeenWithin(msg.ID, msg.Height, v.replayWindow) {
+                metrics.Inc("qbft_msg_verified_total", map[string]string{"result":"replay"})
+                logger.ErrorJ("qbft_verify", map[string]any{"result":"replay", "id": msg.ID, "type": string(msg.Type), "window": v.replayWindow})
+                return fmt.Errorf("replay")
+            }
+        } else {
+            if v.replay.Seen(msg.ID) {
+                metrics.Inc("qbft_msg_verified_total", map[string]string{"result":"replay"})
+                logger.ErrorJ("qbft_verify", map[string]any{"result":"replay", "id": msg.ID, "type": string(msg.Type)})
+                return fmt.Errorf("replay")
+            }
+        }
     }
 
     // context semantics (placeholder, non-breaking):
@@ -194,14 +196,10 @@ func (v *BasicVerifier) Verify(msg Message) error {
             return fmt.Errorf("type-scoped round out of bound")
         }
     }
-    // anti-replay (id-level) — only active if no window configured and not already handled.
-    if v.replay != nil && v.replayWindow == 0 && v.replay.Seen(msg.ID) {
-        metrics.Inc("qbft_msg_verified_total", map[string]string{"result":"replay"})
-        logger.ErrorJ("qbft_verify", map[string]any{"result":"replay", "id": msg.ID, "type": string(msg.Type)})
-        return fmt.Errorf("replay")
-    }
+    // id-level anti-replay handled above when window is disabled
     // ok
     metrics.Inc("qbft_msg_verified_total", labels)
     logger.InfoJ("qbft_verify", map[string]any{"result":"ok", "id": msg.ID, "type": string(msg.Type)})
     return nil
 }
+
