@@ -23,7 +23,11 @@ func (r *ResourceManager) TryOpen() bool {
     for {
         o := atomic.LoadInt64(&r.open)
         if o >= r.limits.MaxConns { return false }
-        if atomic.CompareAndSwapInt64(&r.open, o, o+1) { metrics.Inc("p2p_conn_open_total", nil); return true }
+        if atomic.CompareAndSwapInt64(&r.open, o, o+1) {
+            metrics.Inc("p2p_conn_open_total", nil)
+            metrics.AddGauge("p2p_conns_open", nil, 1)
+            return true
+        }
     }
 }
 
