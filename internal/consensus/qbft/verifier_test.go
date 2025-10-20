@@ -39,3 +39,68 @@ func TestBasicVerifier_Invalid(t *testing.T) {
         t.Fatalf("want invalid count, got %q", dump)
     }
 }
+func TestBasicVerifier_OldHeightReject(t *testing.T) {
+    metrics.Reset()
+    v := NewBasicVerifier()
+    v.SetMinHeight(10)
+    msg := Message{ID:"h9", From:"p", Type:MsgPrepare, Height:9}
+    if err := v.Verify(msg); err == nil {
+        t.Fatalf("want old height error")
+    }
+    dump := metrics.DumpProm()
+    if !strings.Contains(dump, `qbft_msg_verified_total{result="old"} 1`) {
+        t.Fatalf("want old=1, got %q", dump)
+    }
+}
+
+func TestBasicVerifier_InvalidType(t *testing.T) {
+    metrics.Reset()
+    v := NewBasicVerifier()
+    bad := Message{ID:"z", From:"p", Type:Type("bogus")}
+    if err := v.Verify(bad); err == nil {
+        t.Fatalf("want invalid type error")
+    }
+    dump := metrics.DumpProm()
+    if !strings.Contains(dump, `qbft_msg_verified_total{result="error"} 1`) {
+        t.Fatalf("want error=1, got %q", dump)
+    }
+}
+func TestBasicVerifier_RoundWindow(t *testing.T) {
+    metrics.Reset()
+    v := NewBasicVerifier(); v.SetRoundWindow(5)
+    msg := Message{ID:"rw", From:"p", Type:MsgCommit, Round:6}
+    if err := v.Verify(msg); err == nil { t.Fatalf("want round_oob") }
+    dump := metrics.DumpProm()
+    if !strings.Contains(dump, qbft_msg_verified_total{result="round_oob"} 1) {
+        t.Fatalf("want round_oob=1, got %q", dump)
+    }
+}
+
+func TestBasicVerifier_SenderUnauthorized(t *testing.T) {
+    metrics.Reset()
+    v := NewBasicVerifier(); v.SetAllowed("p")
+    if err := v.Verify(Message{ID:"u1", From:"q", Type:MsgPrepare}); err == nil { t.Fatalf("want unauthorized") }
+    dump := metrics.DumpProm()
+    if !strings.Contains(dump, qbft_msg_verified_total{result="unauthorized"} 1) {
+        t.Fatalf("want unauthorized=1, got %q", dump)
+    }
+}
+
+func TestBasicVerifier_SignatureShape(t *testing.T) {
+    metrics.Reset()
+    v := NewBasicVerifier()
+    if err := v.Verify(Message{ID:"s1", From:"p", Type:MsgPrepare, Sig: make([]byte, 8)}); err == nil { t.Fatalf("want sig_invalid") }
+    dump := metrics.DumpProm()
+    if !strings.Contains(dump, qbft_msg_verified_total{result="sig_invalid"} 1) {
+        t.Fatalf("want sig_invalid=1, got %q", dump)
+    }
+}
+
+func TestBasicVerifier_MinHeightBoundaryAccept(t *testing.T) {
+    metrics.Reset()
+    v := NewBasicVerifier(); v.SetMinHeight(10)
+    // boundary height == minHeight should be accepted
+    if err := v.Verify(Message{ID:"hb", From:"p", Type:MsgPrepare, Height:10}); err != nil {
+        t.Fatalf("boundary height should pass: %v", err)
+    }
+}
