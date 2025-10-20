@@ -85,8 +85,9 @@ func (s *State) Process(msg Message) error {
             s.Phase = "prepared"
         }
     case MsgCommit:
-        // Commit only allowed after prepared and for the same proposal id.
-        if s.Phase != "prepared" {
+        // Commit is valid for the current proposal after prepared.
+        // If already in commit phase for the same proposal, treat duplicates as no-op.
+        if s.Phase != "prepared" && s.Phase != "commit" {
             logger.ErrorJ("qbft_state", map[string]any{
                 "op":        "transition",
                 "event_type": string(msg.Type),
@@ -109,12 +110,12 @@ func (s *State) Process(msg Message) error {
             return fmt.Errorf("proposal mismatch")
         }
         if _, ok = s.commitVotes[msg.From]; ok {
-            // Duplicate commit is a no-op.
+            // Duplicate commit (including when phase already is commit) is a no-op.
             break
         }
         s.commitVotes[msg.From] = struct{}{}
         // Minimal rule: first distinct commit advances to commit phase.
-        if len(s.commitVotes) >= 1 {
+        if s.Phase != "commit" && len(s.commitVotes) >= 1 {
             s.Phase = "commit"
         }
     default:
