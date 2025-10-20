@@ -112,7 +112,7 @@ func TestBasicVerifier_ReplayWithinWindow(t *testing.T) {
     if err := v.Verify(Message{ID:"rid", From:"p", Type:MsgPrepare, Height:100}); err != nil { t.Fatalf("first msg: %v", err) }
     if err := v.Verify(Message{ID:"rid", From:"p", Type:MsgPrepare, Height:101}); err == nil { t.Fatalf("want replay within window") }
     dump := metrics.DumpProm()
-    if !strings.Contains(dump, qbft_msg_verified_total{result="replay"} 1) {
+    if !strings.Contains(dump, `qbft_msg_verified_total{result="replay"} 1`) {
         t.Fatalf("want replay count, got %q", dump)
     }
 }

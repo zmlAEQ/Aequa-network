@@ -23,31 +23,6 @@ func NewAntiReplay() *AntiReplay { return &AntiReplay{seen: make(map[string]stru
 // Seen returns true if id already seen; otherwise records and returns false.
 func (r *AntiReplay) Seen(id string) bool {
     if id == "" { return false }
-    r.mu.Lock(); defer r.mu.Unlock()
-    if _, ok := r.seen[id]; ok { return true }
-    r.seen[id] = struct{}{}
-    return false
-}
-
-// SeenWithin returns true if id was seen within the given height window.
-func (r *AntiReplay) SeenWithin(id string, h, window uint64) bool {
-    if id == "" || window == 0 { // window==0 disables windowed replay check
-        return false
-    }
-    r.mu.Lock(); defer r.mu.Unlock()
-    if last, ok := r.hSeen[id]; ok {
-        if h >= last && h-last <= window { return true }
-    }
-    r.hSeen[id] = h
-    return false
-}
-}
-
-func NewAntiReplay() *AntiReplay { return &AntiReplay{seen: make(map[string]struct{})} }
-
-// Seen returns true if id already seen; otherwise records and returns false.
-func (r *AntiReplay) Seen(id string) bool {
-    if id == "" { return false }
     r.mu.Lock()
     defer r.mu.Unlock()
     if _, ok := r.seen[id]; ok { return true }
@@ -55,34 +30,38 @@ func (r *AntiReplay) Seen(id string) bool {
     return false
 }
 
-type BasicVerifier struct {
-    replay      *AntiReplay
-    minHeight   uint64
-    roundWindow uint64
-    allowed     map[string]struct{}
-    replayWindow uint64
+// SeenWithin returns true if id was seen within the given height window.
+func (r *AntiReplay) SeenWithin(id string, h, window uint64) bool {
+    if id == "" || window == 0 { return false }
+    r.mu.Lock()
+    defer r.mu.Unlock()
+    if last, ok := r.hSeen[id]; ok {
+        if h >= last && h-last <= window { return true }
+    }
+    r.hSeen[id] = h
+    return false
 }
+
+type BasicVerifier struct {
+    replay       *AntiReplay
+    minHeight    uint64
+    roundWindow  uint64
+    allowed      map[string]struct{}
+    replayWindow uint64
 }
 
 func NewBasicVerifier() *BasicVerifier { return &BasicVerifier{replay: NewAntiReplay()} }
-func (v *BasicVerifier) SetMinHeight(h uint64)    { v.minHeight = h }
-func (v *BasicVerifier) SetRoundWindow(w uint64)  { v.roundWindow = w }
-func (v *BasicVerifier) SetAllowed(ids ...string) { if v.allowed == nil { v.allowed = map[string]struct{}{} }; for _, id := range ids { v.allowed[id] = struct{}{} } }
-func (v *BasicVerifier) SetReplayWindow(w uint64) { v.replayWindow = w } }
 func (v *BasicVerifier) SetMinHeight(h uint64)    { v.minHeight = h }
 func (v *BasicVerifier) SetRoundWindow(w uint64)  { v.roundWindow = w }
 func (v *BasicVerifier) SetAllowed(ids ...string) {
     if v.allowed == nil { v.allowed = map[string]struct{}{} }
     for _, id := range ids { v.allowed[id] = struct{}{} }
 }
+func (v *BasicVerifier) SetReplayWindow(w uint64) { v.replayWindow = w }
 
 func validType(t Type) bool {
-    switch t {
-    case MsgPreprepare, MsgPrepare, MsgCommit:
-        return true
-    default:
-        return false
-    }
+    switch t { case MsgPreprepare, MsgPrepare, MsgCommit: return true }
+    return false
 }
 
 func (v *BasicVerifier) Verify(msg Message) error {
