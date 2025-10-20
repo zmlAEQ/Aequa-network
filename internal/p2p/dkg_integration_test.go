@@ -1,6 +1,7 @@
 package p2p
 
-import (`r`n    "context"
+import (
+    "context"
     "errors"
     "strings"
     "testing"
