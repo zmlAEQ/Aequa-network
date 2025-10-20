@@ -52,3 +52,41 @@ func FuzzBasicVerifier_NoPanic(f *testing.F) {
     })
 }
 
+
+// FuzzState_NoPanic exercises the qbft.State processor with short sequences
+// that combine commit preconditions, duplicates and proposal-ID mismatches,
+// asserting only that no panics occur and phases remain within known labels.
+func FuzzState_NoPanic(f *testing.F) {
+    // Seeds toggle: havePreprepare, duplicatePrepare, commitMismatchedID
+    f.Add(uint8(0), uint8(0), uint8(0)) // preprepare + no dup + matched commit
+    f.Add(uint8(1), uint8(1), uint8(1)) // no preprepare + dup + mismatched commit
+    f.Add(uint8(0), uint8(1), uint8(0)) // preprepare + dup + matched commit
+
+    f.Fuzz(func(t *testing.T, a, b, c uint8) {
+        st := &State{Leader: "L"}
+        // Optional preprepare
+        if a%2 == 0 {
+            _ = st.Process(Message{ID: "blk", From: "L", Type: MsgPreprepare, Height: 10, Round: 0})
+        }
+        // First prepare (may be before preprepare to exercise error path)
+        _ = st.Process(Message{ID: "blk", From: "P1", Type: MsgPrepare, Height: 10, Round: 1})
+        // Optional duplicate or second distinct prepare to reach threshold when preprepared
+        if b%2 == 0 { // distinct second
+            _ = st.Process(Message{ID: "blk", From: "P2", Type: MsgPrepare, Height: 10, Round: 1})
+        } else { // duplicate
+            _ = st.Process(Message{ID: "blk", From: "P1", Type: MsgPrepare, Height: 10, Round: 1})
+        }
+        // Commit with matched or mismatched proposal ID
+        id := "blk"
+        if c%2 == 1 { id = "blkX" }
+        _ = st.Process(Message{ID: id, From: "C1", Type: MsgCommit, Height: 10, Round: 1})
+
+        // Ensure phase remains one of known labels (empty, preprepared, prepared, commit)
+        switch st.Phase {
+        case "", "preprepared", "prepared", "commit":
+            // ok
+        default:
+            t.Fatalf("unknown phase label: %q", st.Phase)
+        }
+    })
+}
