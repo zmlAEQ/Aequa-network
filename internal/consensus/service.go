@@ -48,17 +48,8 @@ func (s *Service) Start(ctx context.Context) error {
                 logger.InfoJ("consensus_recv", map[string]any{"kind": string(ev.Kind), "trace_id": ev.TraceID, "result": "recv", "latency_ms": dur.Milliseconds()})
                 metrics.Inc("consensus_events_total", map[string]string{"kind": string(ev.Kind)})
                 metrics.ObserveSummary("consensus_proc_ms", map[string]string{"kind": string(ev.Kind)}, float64(dur.Milliseconds()))
-                // Verify placeholder qbft message (stub). Do not alter control flow.
-                msg := qbft.Message{
-                    ID:      time.Now().Format("20060102T150405.000000000"),
-                    From:    "consensus_stub",
-                    Type:    qbft.MsgPrepare,
-                    Height:  0,
-                    Round:   1,
-                    Payload: nil,
-                    TraceID: ev.TraceID,
-                    Sig:     nil,
-                }
+                // Map event to qbft message via adapter (stub mapping only)
+                msg := MapEventToQBFT(ev)
                 _ = s.v.Verify(msg)
                 // Persist last state (stub): log only; ignore control flow
                 if err := s.store.SaveLastState(ctx, state.LastState{Height: msg.Height, Round: msg.Round}); err != nil {
