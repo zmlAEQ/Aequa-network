@@ -32,7 +32,7 @@ func (s *Service) Start(ctx context.Context) error {
         logger.Info("consensus start (stub)")
         return nil
     }
-    if s.v == nil { s.v = qbft.NewBasicVerifier() }
+    if s.v == nil { s.v = qbft.NewBasicVerifierWithPolicy(qbft.DefaultPolicy()) }
     if s.store == nil { s.store = state.NewMemoryStore() }
     if s.st == nil { s.st = &qbft.State{} }
     if ls, err := s.store.LoadLastState(ctx); err != nil {

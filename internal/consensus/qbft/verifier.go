@@ -12,6 +12,19 @@ type Verifier interface {
     Verify(msg Message) error
 }
 
+// Policy groups BasicVerifier configuration for easier injection and defaults.
+type Policy struct {
+    MinHeight     uint64
+    RoundWindow   uint64
+    ReplayWindow  uint64
+    TypeMinHeight map[Type]uint64
+    TypeRoundMax  map[Type]uint64
+    Allowed       []string
+}
+
+// DefaultPolicy returns a zero-valued policy that keeps current behavior.
+func DefaultPolicy() Policy { return Policy{} }
+
 type AntiReplay struct {
     mu     sync.Mutex
     seen   map[string]struct{}
@@ -54,6 +67,18 @@ type BasicVerifier struct {
 }
 
 func NewBasicVerifier() *BasicVerifier { return &BasicVerifier{replay: NewAntiReplay()} }
+// NewBasicVerifierWithPolicy constructs a BasicVerifier configured from policy.
+func NewBasicVerifierWithPolicy(p Policy) *BasicVerifier {
+    v := NewBasicVerifier()
+    if p.MinHeight > 0 { v.minHeight = p.MinHeight }
+    if p.RoundWindow > 0 { v.roundWindow = p.RoundWindow }
+    if p.ReplayWindow > 0 { v.replayWindow = p.ReplayWindow }
+    if len(p.TypeMinHeight) > 0 { v.typeMinHeight = p.TypeMinHeight }
+    if len(p.TypeRoundMax) > 0 { v.typeRoundMax = p.TypeRoundMax }
+    if len(p.Allowed) > 0 { v.SetAllowed(p.Allowed...) }
+    return v
+}
+
 func (v *BasicVerifier) SetMinHeight(h uint64)    { v.minHeight = h }
 func (v *BasicVerifier) SetRoundWindow(w uint64)  { v.roundWindow = w }
 func (v *BasicVerifier) SetAllowed(ids ...string) {
