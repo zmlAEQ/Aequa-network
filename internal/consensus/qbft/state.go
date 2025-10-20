@@ -33,6 +33,7 @@ func (s *State) Process(msg Message) error {
     s.Height = msg.Height
     s.Round = msg.Round
     var ok bool
+    changed := false // only count/log transition when state actually changes
     switch msg.Type {
     case MsgPreprepare:
         // Placeholder leader validation: if Leader is set, only accept from that id
@@ -52,15 +53,10 @@ func (s *State) Process(msg Message) error {
         s.proposalID = msg.ID
         s.prepareVotes = make(map[string]struct{})
         s.commitVotes = make(map[string]struct{})
+        changed = true
     case MsgPrepare:
-        // Fallback for legacy mapping test: if no preprepare yet, allow prepare
-        // to pass and mark phase as "prepare" for observability only.
-        if s.proposalID == "" {
-            s.Phase = "prepare"
-            break
-        }
-        // Accept prepare when preprepared or already prepared for the same proposal id.
-        if s.Phase != "preprepared" && s.Phase != "prepared" {
+        // Strict: require preprepare for this proposal first.
+        if s.proposalID == "" || (s.Phase != "preprepared" && s.Phase != "prepared") {
             logger.ErrorJ("qbft_state", map[string]any{
                 "op":        "transition",
                 "event_type": string(msg.Type),
@@ -84,12 +80,17 @@ func (s *State) Process(msg Message) error {
         }
         if _, ok = s.prepareVotes[msg.From]; ok {
             // Duplicate prepare is a no-op regardless of current phase.
-            break
+            // no-op
+            goto END
         }
         s.prepareVotes[msg.From] = struct{}{}
         if s.Phase == "preprepared" && len(s.prepareVotes) >= 2 { // minimal threshold
             s.Phase = "prepared"
+            changed = true
+            break
         }
+        // counted as processed but no phase change if still below threshold
+        goto END
     case MsgCommit:
         // Commit is valid for the current proposal after prepared.
         // If already in commit phase for the same proposal, treat duplicates as no-op.
@@ -117,25 +118,39 @@ func (s *State) Process(msg Message) error {
         }
         if _, ok = s.commitVotes[msg.From]; ok {
             // Duplicate commit (including when phase already is commit) is a no-op.
-            break
+            // no-op
+            goto END
         }
         s.commitVotes[msg.From] = struct{}{}
         // Minimal rule: first distinct commit advances to commit phase.
         if s.Phase != "commit" && len(s.commitVotes) >= 1 {
             s.Phase = "commit"
+            changed = true
         }
     default:
         // Keep previous phase for unknown types; still record observability.
     }
 
-    // Observability: one log + one counter per successful processed message.
-    logger.InfoJ("qbft_state", map[string]any{
-        "op":        "transition",
-        "event_type": string(msg.Type),
-        "height":    s.Height,
-        "round":     s.Round,
-        "phase":     s.Phase,
-    })
+END:
+    // Observability: log always; count all successfully processed (non-error) messages.
+    if changed {
+        logger.InfoJ("qbft_state", map[string]any{
+            "op":        "transition",
+            "event_type": string(msg.Type),
+            "height":    s.Height,
+            "round":     s.Round,
+            "phase":     s.Phase,
+        })
+    } else {
+        logger.InfoJ("qbft_state", map[string]any{
+            "op":        "transition",
+            "event_type": string(msg.Type),
+            "height":    s.Height,
+            "round":     s.Round,
+            "phase":     s.Phase,
+            "note":      "noop",
+        })
+    }
     metrics.Inc("qbft_state_transitions_total", map[string]string{"type": string(msg.Type)})
     return nil
 }
