@@ -71,7 +71,7 @@ func TestBasicVerifier_RoundWindow(t *testing.T) {
     msg := Message{ID:"rw", From:"p", Type:MsgCommit, Round:6}
     if err := v.Verify(msg); err == nil { t.Fatalf("want round_oob") }
     dump := metrics.DumpProm()
-    if !strings.Contains(dump, qbft_msg_verified_total{result="round_oob"} 1) {
+    if !strings.Contains(dump, `qbft_msg_verified_total{result="round_oob"} 1`) {
         t.Fatalf("want round_oob=1, got %q", dump)
     }
 }
@@ -81,7 +81,7 @@ func TestBasicVerifier_SenderUnauthorized(t *testing.T) {
     v := NewBasicVerifier(); v.SetAllowed("p")
     if err := v.Verify(Message{ID:"u1", From:"q", Type:MsgPrepare}); err == nil { t.Fatalf("want unauthorized") }
     dump := metrics.DumpProm()
-    if !strings.Contains(dump, qbft_msg_verified_total{result="unauthorized"} 1) {
+    if !strings.Contains(dump, `qbft_msg_verified_total{result="unauthorized"} 1`) {
         t.Fatalf("want unauthorized=1, got %q", dump)
     }
 }
@@ -91,7 +91,7 @@ func TestBasicVerifier_SignatureShape(t *testing.T) {
     v := NewBasicVerifier()
     if err := v.Verify(Message{ID:"s1", From:"p", Type:MsgPrepare, Sig: make([]byte, 8)}); err == nil { t.Fatalf("want sig_invalid") }
     dump := metrics.DumpProm()
-    if !strings.Contains(dump, qbft_msg_verified_total{result="sig_invalid"} 1) {
+    if !strings.Contains(dump, `qbft_msg_verified_total{result="sig_invalid"} 1`) {
         t.Fatalf("want sig_invalid=1, got %q", dump)
     }
 }
