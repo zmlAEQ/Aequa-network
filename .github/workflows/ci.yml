@@ -81,19 +81,40 @@ jobs:
         uses: actions/setup-go@v5
         with:
           go-version: '1.24'
-      - name: Verify SNYK_TOKEN is configured
+      - name: Install Snyk CLI
+        uses: snyk/actions/setup@v1
+      - name: Snyk auth
         env:
           SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+        shell: bash
         run: |
+          set -euo pipefail
           if [ -z "$SNYK_TOKEN" ]; then
-            echo "::error::Missing SNYK_TOKEN secret. Generate a Snyk API token and add it in Settings → Secrets → Actions as SNYK_TOKEN";
-            exit 1;
+            echo "::error::Missing SNYK_TOKEN secret. Configure repository secret SNYK_TOKEN.";
+            exit 1
           fi
-      - name: Snyk Open Source (Go)
-        uses: snyk/actions/golang@master
+          snyk auth "$SNYK_TOKEN"
+      - name: Snyk test (retry up to 3)
         env:
           SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
-        with:
-          command: test
-          args: --severity-threshold=high --all-projects
-
+        shell: bash
+        run: |
+          set -euo pipefail
+          for i in 1 2 3; do
+            if snyk test --all-projects --severity-threshold=high --fail-on=all --prune-repeated-subdependencies; then
+              exit 0
+            fi
+            echo "Snyk test failed on attempt $i"
+            if [ "$i" -eq 3 ]; then
+              exit 1
+            fi
+            sleep $((i*15))
+          done
+      - name: Snyk monitor (main only)
+        if: github.ref == 'refs/heads/main'
+        env:
+          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          snyk monitor --all-projects --prune-repeated-subdependencies
