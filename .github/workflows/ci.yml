@@ -86,14 +86,9 @@ jobs:
           SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
         run: |
           if [ -z "$SNYK_TOKEN" ]; then
-            echo "::error::Missing SNYK_TOKEN secret. Generate a Snyk API token and add it in Settings â†’ Secrets â†’ Actions as SNYK_TOKEN";
+            echo "::error::Missing SNYK_TOKEN secret. Generate a Snyk API token and add it in Settings â†?Secrets â†?Actions as SNYK_TOKEN";
             exit 1;
           fi
       - name: Snyk Open Source (Go)
-        uses: snyk/actions/golang@master
-        env:
-          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
-        with:
-          command: test
-          args: --severity-threshold=high --all-projects
+        uses: snyk/actions/setup@v3`n      - name: Auth Snyk`n        env:`n          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}`n        run: snyk auth "$SNYK_TOKEN"`n      - name: Snyk Open Source (Go) with retry`n        shell: bash`n        run: |`n          set -euo pipefail`n          for i in 1 2 3; do`n            snyk test --all-projects --severity-threshold=high && exit 0 || echo "snyk test failed attempt $i";`n            sleep $((5*i));`n          done`n          exit 1
 
