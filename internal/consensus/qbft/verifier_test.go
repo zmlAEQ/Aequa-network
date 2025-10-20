@@ -104,3 +104,22 @@ func TestBasicVerifier_MinHeightBoundaryAccept(t *testing.T) {
         t.Fatalf("boundary height should pass: %v", err)
     }
 }
+
+func TestBasicVerifier_ReplayWithinWindow(t *testing.T) {
+    metrics.Reset()
+    v := NewBasicVerifier(); v.SetReplayWindow(2)
+    // same id at height 100 then 101 within window
+    if err := v.Verify(Message{ID:"rid", From:"p", Type:MsgPrepare, Height:100}); err != nil { t.Fatalf("first msg: %v", err) }
+    if err := v.Verify(Message{ID:"rid", From:"p", Type:MsgPrepare, Height:101}); err == nil { t.Fatalf("want replay within window") }
+    dump := metrics.DumpProm()
+    if !strings.Contains(dump, qbft_msg_verified_total{result="replay"} 1) {
+        t.Fatalf("want replay count, got %q", dump)
+    }
+}
+
+func TestBasicVerifier_ReplayOutsideWindowAccept(t *testing.T) {
+    metrics.Reset()
+    v := NewBasicVerifier(); v.SetReplayWindow(2)
+    if err := v.Verify(Message{ID:"rid2", From:"p", Type:MsgPrepare, Height:100}); err != nil { t.Fatalf("first msg: %v", err) }
+    if err := v.Verify(Message{ID:"rid2", From:"p", Type:MsgPrepare, Height:103}); err != nil { t.Fatalf("outside window should pass: %v", err) }
+}
