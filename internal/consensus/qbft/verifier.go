@@ -86,6 +86,14 @@ func (v *BasicVerifier) Verify(msg Message) error {
         logger.ErrorJ("qbft_verify", map[string]any{"result":"sig_invalid", "type": string(msg.Type)})
         return fmt.Errorf("sig invalid")
     }
+    // context semantic: preprepare must have round == 0 (placeholder constraint)
+    if msg.Type == MsgPreprepare {
+        if msg.Round != 0 {
+            metrics.Inc("qbft_msg_verified_total", map[string]string{"result":"error"})
+            logger.ErrorJ("qbft_verify", map[string]any{"result":"error", "reason":"round_semantic", "type": string(msg.Type), "round": msg.Round})
+            return fmt.Errorf("invalid round for preprepare")
+        }
+    }
     // height window (old height)
     if v.minHeight > 0 && msg.Height < v.minHeight {
         metrics.Inc("qbft_msg_verified_total", map[string]string{"result":"old"})

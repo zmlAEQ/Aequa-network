@@ -30,6 +30,28 @@ func TestBasicVerifier_Replay(t *testing.T) {
     }
 }
 
+func TestBasicVerifier_Preprepare_RoundZero_OK(t *testing.T) {
+    metrics.Reset()
+    v := NewBasicVerifier()
+    msg := Message{ID:"pp0", From:"p", Type:MsgPreprepare, Round:0}
+    if err := v.Verify(msg); err != nil { t.Fatalf("unexpected: %v", err) }
+    dump := metrics.DumpProm()
+    if !strings.Contains(dump, `qbft_msg_verified_total{type="preprepare"} 1`) {
+        t.Fatalf("want ok count for preprepare, got %q", dump)
+    }
+}
+
+func TestBasicVerifier_Preprepare_RoundNonZero_Error(t *testing.T) {
+    metrics.Reset()
+    v := NewBasicVerifier()
+    msg := Message{ID:"pp1", From:"p", Type:MsgPreprepare, Round:1}
+    if err := v.Verify(msg); err == nil { t.Fatalf("want preprepare round semantic error") }
+    dump := metrics.DumpProm()
+    if !strings.Contains(dump, `qbft_msg_verified_total{result="error"} 1`) {
+        t.Fatalf("want error=1, got %q", dump)
+    }
+}
+
 func TestBasicVerifier_Invalid(t *testing.T) {
     metrics.Reset()
     v := NewBasicVerifier()
