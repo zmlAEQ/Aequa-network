@@ -13,11 +13,12 @@ type Verifier interface {
 }
 
 type AntiReplay struct {
-    mu   sync.Mutex
-    seen map[string]struct{}
+    mu     sync.Mutex
+    seen   map[string]struct{}
+    hSeen  map[string]uint64
 }
 
-func NewAntiReplay() *AntiReplay { return &AntiReplay{seen: make(map[string]struct{})} }
+func NewAntiReplay() *AntiReplay { return &AntiReplay{seen: make(map[string]struct{}), hSeen: make(map[string]uint64)} }
 
 // Seen returns true if id already seen; otherwise records and returns false.
 func (r *AntiReplay) Seen(id string) bool {
@@ -29,11 +30,24 @@ func (r *AntiReplay) Seen(id string) bool {
     return false
 }
 
+// SeenWithin returns true if id was seen within the given height window.
+func (r *AntiReplay) SeenWithin(id string, h, window uint64) bool {
+    if id == "" || window == 0 { return false }
+    r.mu.Lock()
+    defer r.mu.Unlock()
+    if last, ok := r.hSeen[id]; ok {
+        if h >= last && h-last <= window { return true }
+    }
+    r.hSeen[id] = h
+    return false
+}
+
 type BasicVerifier struct {
-    replay      *AntiReplay
-    minHeight   uint64
-    roundWindow uint64
-    allowed     map[string]struct{}
+    replay       *AntiReplay
+    minHeight    uint64
+    roundWindow  uint64
+    allowed      map[string]struct{}
+    replayWindow uint64
 }
 
 func NewBasicVerifier() *BasicVerifier { return &BasicVerifier{replay: NewAntiReplay()} }
@@ -43,14 +57,11 @@ func (v *BasicVerifier) SetAllowed(ids ...string) {
     if v.allowed == nil { v.allowed = map[string]struct{}{} }
     for _, id := range ids { v.allowed[id] = struct{}{} }
 }
+func (v *BasicVerifier) SetReplayWindow(w uint64) { v.replayWindow = w }
 
 func validType(t Type) bool {
-    switch t {
-    case MsgPreprepare, MsgPrepare, MsgCommit:
-        return true
-    default:
-        return false
-    }
+    switch t { case MsgPreprepare, MsgPrepare, MsgCommit: return true }
+    return false
 }
 
 func (v *BasicVerifier) Verify(msg Message) error {
@@ -86,6 +97,12 @@ func (v *BasicVerifier) Verify(msg Message) error {
         metrics.Inc("qbft_msg_verified_total", map[string]string{"result":"round_oob"})
         logger.ErrorJ("qbft_verify", map[string]any{"result":"round_oob", "round": msg.Round, "max": v.roundWindow, "type": string(msg.Type)})
         return fmt.Errorf("round out of bound")
+    }
+    // windowed replay (same id within height window)
+    if v.replay != nil && v.replay.SeenWithin(msg.ID, msg.Height, v.replayWindow) {
+        metrics.Inc("qbft_msg_verified_total", map[string]string{"result":"replay"})
+        logger.ErrorJ("qbft_verify", map[string]any{"result":"replay", "id": msg.ID, "type": string(msg.Type), "window": v.replayWindow})
+        return fmt.Errorf("replay")
     }
     // anti-replay
     if v.replay != nil && v.replay.Seen(msg.ID) {
