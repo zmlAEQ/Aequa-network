@@ -16,4 +16,7 @@ type Message struct {
     Payload []byte
     ID      string
     TraceID string
+    // Sig is a placeholder for a signature/aggregate signature byte slice.
+    // For now, the verifier仅检查形状（长度阈值），不做密码学验真。
+    Sig     []byte
 }
