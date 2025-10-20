@@ -70,7 +70,7 @@ func (v *BasicVerifier) Verify(msg Message) error {
         }
     }
     // signature shape placeholder (no crypto)
-    if msg.Sig != nil && len(msg.Sig) > 0 && len(msg.Sig) < 32 {
+    if l := len(msg.Sig); l > 0 && l < 32 {
         metrics.Inc("qbft_msg_verified_total", map[string]string{"result":"sig_invalid"})
         logger.ErrorJ("qbft_verify", map[string]any{"result":"sig_invalid", "type": string(msg.Type)})
         return fmt.Errorf("sig invalid")
