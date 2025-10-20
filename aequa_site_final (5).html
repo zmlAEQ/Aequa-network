@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="en" class="scroll-smooth">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Aequa Network</title>
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Font Awesome for icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" integrity="sha512-9/WQ9yNqOjANt6J/gvtGqTq6qH+pcA9u4rZucUIFvtjKXAPqiX/AcQXUd7Z2Znd2aEK4XvIjzYFIZPBRwwq+kQ==" crossorigin="anonymous" referrerpolicy="no-referrer" />
+  <style>
+    body { font-family: 'Inter', sans-serif; }
+  </style>
+</head>
+<body class="bg-gray-900 text-gray-200">
+  <!-- Navigation -->
+  <nav class="bg-gray-900 fixed w-full z-20 top-0 shadow-md">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div class="flex items-center justify-between h-16">
+        <!-- Logo and Brand -->
+        <div class="flex items-center">
+          <img src="logo_cropped.png" class="h-10 w-10 mr-2" alt="Aequa Logo">
+          <span class="text-white text-xl font-semibold">Aequa Network</span>
+        </div>
+        <!-- Navigation Links -->
+        <div class="hidden md:flex space-x-6">
+          <a href="#problem" class="text-gray-400 hover:text-white transition">Problem</a>
+          <a href="#solution" class="text-gray-400 hover:text-white transition">Solution</a>
+          <a href="#technology" class="text-gray-400 hover:text-white transition">Technology</a>
+          <a href="#about" class="text-gray-400 hover:text-white transition">Team</a>
+        </div>
+      </div>
+    </div>
+  </nav>
+
+  <!-- Hero Section -->
+  <section id="hero" class="pt-28 pb-16 flex flex-col items-center text-center px-4">
+    <h1 class="text-5xl md:text-7xl font-bold text-white mb-4">Fair Sequencing for Layer 2</h1>
+    <p class="max-w-2xl text-lg md:text-xl text-gray-400 mb-8">A modular DVT engine that ends MEV extraction and redirects value back to users and LPs.</p>
+    <div class="flex flex-wrap justify-center gap-4">
+      <!-- Link to the official two-page pitch deck. The filename matches the
+           final PDF generated during the project and will download to the
+           user's device. -->
+      <!-- Link to the latest official pitch deck PDF -->
+      <a href="aequa_pitch_deck .pdf" download class="bg-orange-500 hover:bg-orange-600 text-gray-900 font-semibold py-3 px-6 rounded-lg shadow transition transform hover:scale-105">Download Pitch Deck</a>
+      <a href="https://github.com/zmlAEQ/Aequa-network" target="_blank" class="border border-orange-500 text-orange-500 hover:bg-orange-500 hover:text-gray-900 font-semibold py-3 px-6 rounded-lg shadow transition transform hover:scale-105">View on GitHub</a>
+    </div>
+  </section>
+
+  <!-- Problem Section -->
+  <section id="problem" class="py-16 px-4 bg-gray-800">
+    <div class="max-w-7xl mx-auto">
+      <h2 class="text-3xl font-bold text-center mb-12 text-white">Layer 2s Are Stuck</h2>
+      <div class="grid md:grid-cols-2 gap-8">
+        <div class="bg-gray-700 rounded-lg p-6 hover:shadow-lg transition-transform hover:scale-105">
+          <h3 class="text-xl font-semibold text-orange-400 mb-2">Centralized Sequencers</h3>
+          <p class="text-gray-300">Create risk and leak billions in MEV.</p>
+        </div>
+        <div class="bg-gray-700 rounded-lg p-6 hover:shadow-lg transition-transform hover:scale-105">
+          <h3 class="text-xl font-semibold text-orange-400 mb-2">Shared Sequencers</h3>
+          <p class="text-gray-300">Demand a risky “heart transplant,�?so no one adopts them.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Solution Section -->
+  <section id="solution" class="py-16 px-4">
+    <div class="max-w-7xl mx-auto">
+      <h2 class="text-3xl font-bold text-center mb-12 text-white">Our “Trojan Horse�?Strategy</h2>
+      <div class="grid md:grid-cols-2 gap-8">
+        <div class="bg-gray-700 rounded-lg p-8 flex flex-col items-center text-center hover:shadow-lg transition-transform hover:scale-105">
+          <i class="fa-solid fa-plug-circle-bolt text-4xl text-orange-400 mb-4"></i>
+          <h3 class="text-xl font-semibold text-white mb-2">Plug In as a Security Upgrade</h3>
+          <p class="text-gray-300">We start by offering a simple DVT client to make existing sequencers fault‑tolerant and censorship‑resistant.</p>
+        </div>
+        <div class="bg-gray-700 rounded-lg p-8 flex flex-col items-center text-center hover:shadow-lg transition-transform hover:scale-105">
+          <i class="fa-solid fa-unlock-keyhole text-4xl text-orange-400 mb-4"></i>
+          <h3 class="text-xl font-semibold text-white mb-2">Activate Fairness</h3>
+          <p class="text-gray-300">A simple software update then enables our full fair‑sequencing engine, powered by pre‑consensus auctions and privacy tech.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Technology Section -->
+  <section id="technology" class="py-16 px-4 bg-gray-800">
+    <div class="max-w-7xl mx-auto">
+      <h2 class="text-3xl font-bold text-center mb-12 text-white">Built on Three Pillars of Innovation</h2>
+      <div class="grid md:grid-cols-3 gap-8">
+        <div class="bg-gray-700 rounded-lg p-6 hover:shadow-lg transition-transform hover:scale-105">
+          <h3 class="text-xl font-semibold text-orange-400 mb-2">Privacy (BEAST‑MEV)</h3>
+          <p class="text-gray-300">Production‑grade, CCA‑secure pre‑sequencing encryption eliminates front‑running.</p>
+        </div>
+        <div class="bg-gray-700 rounded-lg p-6 hover:shadow-lg transition-transform hover:scale-105">
+          <h3 class="text-xl font-semibold text-orange-400 mb-2">Fairness (DFBA)</h3>
+          <p class="text-gray-300">A competitive solver market using Dual Flow Batch Auctions finds the best execution for users.</p>
+        </div>
+        <div class="bg-gray-700 rounded-lg p-6 hover:shadow-lg transition-transform hover:scale-105">
+          <h3 class="text-xl font-semibold text-orange-400 mb-2">Security ($AEQ)</h3>
+          <p class="text-gray-300">An economic security model with staking and slashing ensures the network’s integrity.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- About Section -->
+  <section id="about" class="py-16 px-4">
+    <div class="max-w-5xl mx-auto text-center">
+      <h2 class="text-3xl font-bold mb-8 text-white">Built by a Builder</h2>
+      <p class="text-lg text-gray-300 leading-7 max-w-3xl mx-auto">Aequa Network was founded by <span class="font-semibold text-orange-400">Ziming Liu</span>, a blockchain and cryptography enthusiast with deep experience in distributed consensus protocols. After witnessing the structural flaws of L2 centralization firsthand, he built Aequa to provide a pragmatic and powerful solution.</p>
+    </div>
+  </section>
+
+  <!-- Footer -->
+  <footer class="bg-gray-800 py-8">
+    <div class="max-w-7xl mx-auto px-4 text-center">
+      <p class="text-gray-400 mb-4">Contact: <a href="mailto:zmliu0208@gmail.com" class="text-orange-400 hover:text-orange-500">zmliu0208@gmail.com</a></p>
+      <p class="text-gray-400 mb-4">Follow us on <a href="https://x.com/AequaNetwork" target="_blank" class="text-orange-400 hover:text-orange-500">X</a></p>
+      <p class="text-gray-500">© 2025 Aequa Network</p>
+    </div>
+  </footer>
+</body>
+</html>
