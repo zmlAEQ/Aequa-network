@@ -1,6 +1,6 @@
 package p2p
 
-import (
+import (`r`n    "context"
     "errors"
     "strings"
     "testing"
@@ -36,7 +36,7 @@ func TestStart_ClusterVerifyMetrics(t *testing.T) {
     s := New()
     s.SetDKG(errCluster{})
     // Start triggers cluster verification once.
-    if err := s.Start(nil); err != nil { t.Fatalf("start: %v", err) }
+    if err := s.Start(context.Background()); err != nil { t.Fatalf("start: %v", err) }
     dump := metrics.DumpProm()
     if !strings.Contains(dump, `p2p_dkg_cluster_checks_total{result="error"} 1`) {
         t.Fatalf("want cluster check error count=1, got %q", dump)
