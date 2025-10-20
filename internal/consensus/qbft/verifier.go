@@ -48,6 +48,9 @@ type BasicVerifier struct {
     roundWindow  uint64
     allowed      map[string]struct{}
     replayWindow uint64
+    // type-scoped windows (placeholders; 0 disables)
+    typeMinHeight map[Type]uint64
+    typeRoundMax  map[Type]uint64
 }
 
 func NewBasicVerifier() *BasicVerifier { return &BasicVerifier{replay: NewAntiReplay()} }
@@ -58,6 +61,18 @@ func (v *BasicVerifier) SetAllowed(ids ...string) {
     for _, id := range ids { v.allowed[id] = struct{}{} }
 }
 func (v *BasicVerifier) SetReplayWindow(w uint64) { v.replayWindow = w }
+
+// SetTypeMinHeight sets a per-type minimum acceptable height (0 disables for that type).
+func (v *BasicVerifier) SetTypeMinHeight(t Type, h uint64) {
+    if v.typeMinHeight == nil { v.typeMinHeight = map[Type]uint64{} }
+    v.typeMinHeight[t] = h
+}
+
+// SetTypeRoundMax sets a per-type round upper bound (0 disables for that type).
+func (v *BasicVerifier) SetTypeRoundMax(t Type, max uint64) {
+    if v.typeRoundMax == nil { v.typeRoundMax = map[Type]uint64{} }
+    v.typeRoundMax[t] = max
+}
 
 func validType(t Type) bool {
     switch t { case MsgPreprepare, MsgPrepare, MsgCommit: return true }
@@ -128,6 +143,22 @@ func (v *BasicVerifier) Verify(msg Message) error {
             metrics.Inc("qbft_msg_verified_total", map[string]string{"result":"error"})
             logger.ErrorJ("qbft_verify", map[string]any{"result":"error", "reason":"round_semantic", "type": string(msg.Type), "round": msg.Round})
             return fmt.Errorf("invalid round for %s", msg.Type)
+        }
+    }
+
+    // type-scoped windows (preserve metric label space; use reason in logs)
+    if v.typeMinHeight != nil {
+        if min, ok := v.typeMinHeight[msg.Type]; ok && min > 0 && msg.Height < min {
+            metrics.Inc("qbft_msg_verified_total", map[string]string{"result":"old"})
+            logger.ErrorJ("qbft_verify", map[string]any{"result":"old", "reason":"type_height_old", "type": string(msg.Type), "height": msg.Height, "min": min})
+            return fmt.Errorf("type-scoped old height")
+        }
+    }
+    if v.typeRoundMax != nil {
+        if max, ok := v.typeRoundMax[msg.Type]; ok && max > 0 && msg.Round > max {
+            metrics.Inc("qbft_msg_verified_total", map[string]string{"result":"round_oob"})
+            logger.ErrorJ("qbft_verify", map[string]any{"result":"round_oob", "reason":"type_round_oob", "type": string(msg.Type), "round": msg.Round, "max": max})
+            return fmt.Errorf("type-scoped round out of bound")
         }
     }
     // anti-replay
