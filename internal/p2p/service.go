@@ -1,4 +1,4 @@
-package p2p
+﻿package p2p
 
 import (
     "context"
@@ -11,33 +11,11 @@ import (
     "github.com/zmlAEQ/Aequa-network/pkg/metrics"
 )
 
-type Service struct{
-    mgr   *Manager
-    gate  Gate
-    rman  *ResourceManager
-    hook  Hook
-    dkgv  dkg.Verifier
-}
+type Service struct{`r`n    mgr   *Manager`r`n    gate  Gate`r`n    rman  *ResourceManager`r`n    hook  Hook`r`n    dkgv  dkg.Verifier`r`n    cfg   Config`r`n}
 
-func New() *Service { return &Service{ mgr: NewManager(), gate: AllowAllGate{}, rman: NewResourceManager(DefaultResourceLimits()), hook: LogHook{}, dkgv: dkg.NoopVerifier{} } }
+func New() *Service { return &Service{ mgr: NewManager(), gate: AllowAllGate{}, rman: NewResourceManager(DefaultResourceLimits()), hook: LogHook{}, dkgv: dkg.NoopVerifier{}, cfg: DefaultConfig() } }, rman: NewResourceManager(DefaultResourceLimits()), hook: LogHook{}, dkgv: dkg.NoopVerifier{} } }
 func (s *Service) Name() string { return "p2p" }
-func (s *Service) Start(ctx context.Context) error {
-    begin := time.Now()
-    dur := time.Since(begin).Milliseconds()
-    logger.InfoJ("service_op", map[string]any{"service":"p2p", "op":"start", "result":"ok", "latency_ms": dur})
-    metrics.ObserveSummary("service_op_ms", map[string]string{"service":"p2p", "op":"start"}, float64(dur))
-    // DKG/cluster-lock verification (audit + metrics)
-    if s.dkgv != nil {
-        if err := s.dkgv.VerifyCluster(); err != nil {
-            logger.ErrorJ("p2p_dkg_cluster", map[string]any{"result":"error", "err": err.Error()})
-            metrics.Inc("p2p_dkg_cluster_checks_total", map[string]string{"result":"error"})
-        } else {
-            logger.InfoJ("p2p_dkg_cluster", map[string]any{"result":"ok"})
-            metrics.Inc("p2p_dkg_cluster_checks_total", map[string]string{"result":"ok"})
-        }
-    }
-    return nil
-}
+func (s *Service) Start(ctx context.Context) error {`r`n    begin := time.Now()`r`n    // Config validation (fail-fast)`r`n    if err := s.cfg.Validate(s.dkgv != nil); err != nil {`r`n        metrics.Inc("p2p_config_checks_total", map[string]string{"result":"error"})`r`n        logger.ErrorJ("p2p_config", map[string]any{"result":"error", "err": err.Error()})`r`n        dur := time.Since(begin).Milliseconds()`r`n        logger.ErrorJ("service_op", map[string]any{"service":"p2p", "op":"start", "result":"error", "latency_ms": dur})`r`n        metrics.ObserveSummary("service_op_ms", map[string]string{"service":"p2p", "op":"start"}, float64(dur))`r`n        return err`r`n    }`r`n    metrics.Inc("p2p_config_checks_total", map[string]string{"result":"ok"})`r`n    // DKG/cluster-lock verification (fail-fast)`r`n    if s.dkgv != nil {`r`n        if err := s.dkgv.VerifyCluster(); err != nil {`r`n            logger.ErrorJ("p2p_dkg_cluster", map[string]any{"result":"error", "err": err.Error()})`r`n            metrics.Inc("p2p_dkg_cluster_checks_total", map[string]string{"result":"error"})`r`n            dur := time.Since(begin).Milliseconds()`r`n            logger.ErrorJ("service_op", map[string]any{"service":"p2p", "op":"start", "result":"error", "latency_ms": dur})`r`n            metrics.ObserveSummary("service_op_ms", map[string]string{"service":"p2p", "op":"start"}, float64(dur))`r`n            return err`r`n        } else {`r`n            logger.InfoJ("p2p_dkg_cluster", map[string]any{"result":"ok"})`r`n            metrics.Inc("p2p_dkg_cluster_checks_total", map[string]string{"result":"ok"})`r`n        }`r`n    }`r`n    dur := time.Since(begin).Milliseconds()`r`n    logger.InfoJ("service_op", map[string]any{"service":"p2p", "op":"start", "result":"ok", "latency_ms": dur})`r`n    metrics.ObserveSummary("service_op_ms", map[string]string{"service":"p2p", "op":"start"}, float64(dur))`r`n    return nil`r`n}
 func (s *Service) Stop(ctx context.Context) error  {
     begin := time.Now()
     dur := time.Since(begin).Milliseconds()
@@ -100,3 +78,5 @@ func (s *Service) Disconnect(id PeerID) {
     s.rman.Close()
     s.hook.OnPeerLeave(string(id))
 }
+// SetConfig injects a validated P2P config.
+func (s *Service) SetConfig(c Config) { s.cfg = c }
