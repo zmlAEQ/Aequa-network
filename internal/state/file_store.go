@@ -83,7 +83,8 @@ func readFile(path string) (LastState, error) {
     defer f.Close()
     var hdr [4 + 2 + 2 + 4 + 4]byte
     if _, err = io.ReadFull(f, hdr[:]); err != nil { return LastState{}, err }
-    off := 0\n    mg := binary.BigEndian.Uint32(hdr[off:]); off += 4
+    off := 0
+    mg := binary.BigEndian.Uint32(hdr[off:]); off += 4
     if mg != magic { return LastState{}, errors.New("bad magic") }
     ver := binary.BigEndian.Uint16(hdr[off:]); off += 2
     _ = ver // reserved for future use
