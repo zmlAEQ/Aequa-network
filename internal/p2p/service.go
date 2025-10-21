@@ -17,27 +17,49 @@ type Service struct{
     rman  *ResourceManager
     hook  Hook
     dkgv  dkg.Verifier
+    cfg   Config
 }
 
-func New() *Service { return &Service{ mgr: NewManager(), gate: AllowAllGate{}, rman: NewResourceManager(DefaultResourceLimits()), hook: LogHook{}, dkgv: dkg.NoopVerifier{} } }
+func New() *Service { return &Service{ mgr: NewManager(), gate: AllowAllGate{}, rman: NewResourceManager(DefaultResourceLimits()), hook: LogHook{}, dkgv: dkg.NoopVerifier{}, cfg: DefaultConfig() } }
 func (s *Service) Name() string { return "p2p" }
+
+// SetConfig injects a validated P2P config.
+func (s *Service) SetConfig(c Config) { s.cfg = c }
+
 func (s *Service) Start(ctx context.Context) error {
     begin := time.Now()
-    dur := time.Since(begin).Milliseconds()
-    logger.InfoJ("service_op", map[string]any{"service":"p2p", "op":"start", "result":"ok", "latency_ms": dur})
-    metrics.ObserveSummary("service_op_ms", map[string]string{"service":"p2p", "op":"start"}, float64(dur))
-    // DKG/cluster-lock verification (audit + metrics)
+    // Config validation (fail-fast)
+    if err := s.cfg.Validate(s.dkgv != nil); err != nil {
+        metrics.Inc("p2p_config_checks_total", map[string]string{"result":"error"})
+        logger.ErrorJ("p2p_config", map[string]any{"result":"error", "err": err.Error()})
+        dur := time.Since(begin).Milliseconds()
+        logger.ErrorJ("service_op", map[string]any{"service":"p2p", "op":"start", "result":"error", "latency_ms": dur})
+        metrics.ObserveSummary("service_op_ms", map[string]string{"service":"p2p", "op":"start"}, float64(dur))
+        return err
+    }
+    metrics.Inc("p2p_config_checks_total", map[string]string{"result":"ok"})
+
+    // DKG/cluster-lock verification (fail-fast)
     if s.dkgv != nil {
         if err := s.dkgv.VerifyCluster(); err != nil {
             logger.ErrorJ("p2p_dkg_cluster", map[string]any{"result":"error", "err": err.Error()})
             metrics.Inc("p2p_dkg_cluster_checks_total", map[string]string{"result":"error"})
+            dur := time.Since(begin).Milliseconds()
+            logger.ErrorJ("service_op", map[string]any{"service":"p2p", "op":"start", "result":"error", "latency_ms": dur})
+            metrics.ObserveSummary("service_op_ms", map[string]string{"service":"p2p", "op":"start"}, float64(dur))
+            return err
         } else {
             logger.InfoJ("p2p_dkg_cluster", map[string]any{"result":"ok"})
             metrics.Inc("p2p_dkg_cluster_checks_total", map[string]string{"result":"ok"})
         }
     }
+
+    dur := time.Since(begin).Milliseconds()
+    logger.InfoJ("service_op", map[string]any{"service":"p2p", "op":"start", "result":"ok", "latency_ms": dur})
+    metrics.ObserveSummary("service_op_ms", map[string]string{"service":"p2p", "op":"start"}, float64(dur))
     return nil
 }
+
 func (s *Service) Stop(ctx context.Context) error  {
     begin := time.Now()
     dur := time.Since(begin).Milliseconds()
@@ -54,7 +76,7 @@ func NewWithOpts(mgr *Manager, gate Gate, rman *ResourceManager, hook Hook) *Ser
     if gate == nil { gate = AllowAllGate{} }
     if rman == nil { rman = NewResourceManager(DefaultResourceLimits()) }
     if hook == nil { hook = NopHook{} }
-    return &Service{mgr: mgr, gate: gate, rman: rman, hook: hook, dkgv: dkg.NoopVerifier{}}
+    return &Service{mgr: mgr, gate: gate, rman: rman, hook: hook, dkgv: dkg.NoopVerifier{}, cfg: DefaultConfig()}
 }
 
 // SetDKG allows tests or wiring to inject a DKG/cluster-lock verifier.
