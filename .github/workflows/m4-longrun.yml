@@ -15,7 +15,7 @@ concurrency:
 env:
   GO_VERSION: '1.24'
   CHUNKS: '4'
-  CHUNK_MIN: '360' # 6 hours per chunk
+  CHUNK_MIN: '300' # 5 hours per chunk (avoid 6h runner cap)
 
 jobs:
   cluster-health:
