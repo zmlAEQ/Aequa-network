@@ -28,6 +28,8 @@ func (s *Service) SetConfig(c Config) { s.cfg = c }
 
 func (s *Service) Start(ctx context.Context) error {
     begin := time.Now()
+    // E2E hooks (only active in e2e builds): may adjust cfg (MaxConns) or DKG
+    applyE2E(s)
     // Config validation (fail-fast)
     if err := s.cfg.Validate(s.dkgv != nil); err != nil {
         metrics.Inc("p2p_config_checks_total", map[string]string{"result":"error"})
@@ -38,6 +40,9 @@ func (s *Service) Start(ctx context.Context) error {
         return err
     }
     metrics.Inc("p2p_config_checks_total", map[string]string{"result":"ok"})
+
+    // E2E HTTP control surface (connect/disconnect) if enabled via build tag.
+    startP2PE2E(s)
 
     // Apply config to Gate pipeline: AllowList -> Rate -> Score (normalized reasons)
     // If none configured, keep AllowAll behaviour.
