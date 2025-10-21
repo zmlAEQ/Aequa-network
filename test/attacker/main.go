@@ -2,9 +2,11 @@ package main
 
 import (
     "bytes"
+    "crypto/rand"
+    "encoding/binary"
     "encoding/json"
     "fmt"
-    "math/rand"
+    mrand "math/rand"
     "net/http"
     "os"
     "strings"
@@ -31,7 +33,17 @@ func postJSON(url string, v any) error {
 }
 
 func main() {
-    rand.Seed(time.Now().UnixNano())
+    // Local RNG seeded from crypto/rand to avoid deprecated global Seed and
+    // ensure per-process unpredictability without using time-based seeds.
+    var seed int64
+    var b8 [8]byte
+    if _, err := rand.Read(b8[:]); err == nil {
+        seed = int64(binary.LittleEndian.Uint64(b8[:]))
+    } else {
+        seed = time.Now().UnixNano()
+    }
+    r := mrand.New(mrand.NewSource(seed))
+
     eps := os.Getenv("ENDPOINTS")
     if eps == "" { eps = "http://127.0.0.1:4610,http://127.0.0.1:4611,http://127.0.0.1:4612,http://127.0.0.1:4613" }
     targets := strings.Split(eps, ",")
@@ -44,12 +56,12 @@ func main() {
     defer ticker.Stop()
     for {
         <-ticker.C
-        u := urls[rand.Intn(len(urls))]
+        u := urls[r.Intn(len(urls))]
         // Random scenario selector
-        sc := rand.Intn(6)
+        sc := r.Intn(6)
         switch sc {
         case 0: // valid preprepare then store a commit for replay
-            h := uint64(rand.Intn(1000) + 1)
+            h := uint64(r.Intn(1000) + 1)
             pre := Message{From:"L", Type:"preprepare", Height:h, Round:0, ID:fmt.Sprintf("blk-%d", h)}
             _ = postJSON(u, pre)
             cm := Message{From:"C1", Type:"commit", Height:h, Round:1, ID:pre.ID}
@@ -58,7 +70,7 @@ func main() {
         case 1: // replay stored commit
             if storedCommit != nil { _ = postJSON(u, *storedCommit) }
         case 2: // commit with mismatched proposal id (safety)
-            h := uint64(rand.Intn(1000) + 1)
+            h := uint64(r.Intn(1000) + 1)
             pre := Message{From:"L", Type:"preprepare", Height:h, Round:0, ID:fmt.Sprintf("blk-%d", h)}
             _ = postJSON(u, pre)
             bad := Message{From:"C2", Type:"commit", Height:h, Round:1, ID:"other"}
@@ -69,7 +81,7 @@ func main() {
         case 4: // short signature shape
             _ = postJSON(u, Message{From:"S", Type:"prepare", Height:12, Round:1, ID:"z", Sig:[]byte{1,2,3}})
         default: // ok prepare to keep liveness visible
-            h := uint64(rand.Intn(1000) + 1)
+            h := uint64(r.Intn(1000) + 1)
             pre := Message{From:"L", Type:"preprepare", Height:h, Round:0, ID:fmt.Sprintf("blk-%d", h)}
             _ = postJSON(u, pre)
             _ = postJSON(u, Message{From:"P1", Type:"prepare", Height:h, Round:1, ID:pre.ID})
@@ -77,4 +89,3 @@ func main() {
         }
     }
 }
-
