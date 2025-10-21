@@ -91,7 +91,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
-        with: { go-version: ${{ env.GO_VERSION }} }
+        with:
+          go-version: ${{ env.GO_VERSION }}
       - name: Run API fuzz
         id: run
         shell: bash
@@ -117,7 +118,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
-        with: { go-version: ${{ env.GO_VERSION }} }
+        with:
+          go-version: ${{ env.GO_VERSION }}
       - name: Run QBFT fuzz
         id: run
         shell: bash
@@ -143,7 +145,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
-        with: { go-version: ${{ env.GO_VERSION }} }
+        with:
+          go-version: ${{ env.GO_VERSION }}
       - name: Stress P2P + DKG suites
         id: run
         shell: bash
@@ -175,7 +178,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
-        with: { go-version: ${{ env.GO_VERSION }} }
+        with:
+          go-version: ${{ env.GO_VERSION }}
       - name: Stress FileStore
         id: run
         shell: bash
@@ -239,7 +243,7 @@ jobs:
               if ! curl -fsS localhost:$((4620+i))>/dev/null; then ok=0; echo "metrics probe fail on node $i" | tee -a chaos-e2e.out; fi
             done
             n=$((RANDOM % 4))
-            docker compose restart aequa-node-$n || true
+            ${DOCKER_COMPOSE} restart aequa-node-$n || true
             sleep 10
           done
           if [ "$ok" -eq 1 ]; then status=ok; else status=fail; fi
