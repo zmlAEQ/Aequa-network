@@ -20,11 +20,12 @@ concurrency:
 
 env:
   GO_VERSION: '1.24'
-  API_FUZZ_TIME_LONG: '30m'
-  QBFT_FUZZ_TIME_LONG: '90m'
-  P2P_LOOPS_LONG: '40'
-  STATE_LOOPS_LONG: '20'
-  CHAOS_MINUTES_LONG: '60'
+  # 24h long-run minutes
+  API_FUZZ_MINUTES: '1440'
+  QBFT_FUZZ_MINUTES: '1440'
+  P2P_MINUTES: '1440'
+  STATE_MINUTES: '1440'
+  CHAOS_MINUTES_LONG: '1440'
 
 jobs:
   cluster-health:
@@ -33,7 +34,7 @@ jobs:
     continue-on-error: true
     outputs:
       status: ${{ steps.health.outputs.status }}
-    timeout-minutes: 30
+    timeout-minutes: 120
     steps:
       - uses: actions/checkout@v4
       - name: Check Docker environment
@@ -56,11 +57,12 @@ jobs:
         run: |
           set -euo pipefail
           ${DOCKER_COMPOSE} up --build -d
-      - name: Run cluster health check
+      - name: Run cluster health check (wait 120s)
         id: health
         shell: bash
         run: |
           set +e
+          export WAIT_SECS=120
           if bash ./.github/scripts/m4-health-check.sh; then
             echo "status=ok" >> $GITHUB_OUTPUT
           else
@@ -87,20 +89,20 @@ jobs:
     continue-on-error: true
     outputs:
       status: ${{ steps.run.outputs.status }}
-    timeout-minutes: 120
+    timeout-minutes: 1500
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
         with:
           go-version: ${{ env.GO_VERSION }}
-      - name: Run API fuzz
+      - name: Run API fuzz (24h timeboxed)
         id: run
         shell: bash
         run: |
-          set -euo pipefail
-          time go test ./internal/api -run '^$' -fuzz=Fuzz -fuzztime=${API_FUZZ_TIME_LONG} | tee api-fuzz.out || true
-          if grep -q '\bfuzzing crashed\b\|panic:' api-fuzz.out; then status=fail; else status=ok; fi
-          echo "status=$status" >> $GITHUB_OUTPUT
+          set +e
+          bash ./.github/scripts/go-fuzz-loop.sh ./internal/api ${API_FUZZ_MINUTES} api-fuzz.out
+          rc=$?
+          if [ "$rc" -eq 0 ]; then echo "status=ok" >> $GITHUB_OUTPUT; else echo "status=fail" >> $GITHUB_OUTPUT; fi
       - name: Upload artifact
         if: always()
         uses: actions/upload-artifact@v4
@@ -114,20 +116,20 @@ jobs:
     continue-on-error: true
     outputs:
       status: ${{ steps.run.outputs.status }}
-    timeout-minutes: 180
+    timeout-minutes: 1500
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
         with:
           go-version: ${{ env.GO_VERSION }}
-      - name: Run QBFT fuzz
+      - name: Run QBFT fuzz (24h timeboxed)
         id: run
         shell: bash
         run: |
-          set -euo pipefail
-          time go test ./internal/consensus/qbft -run '^$' -fuzz=Fuzz -fuzztime=${QBFT_FUZZ_TIME_LONG} | tee qbft-fuzz.out || true
-          if grep -q '\bfuzzing crashed\b\|panic:' qbft-fuzz.out; then status=fail; else status=ok; fi
-          echo "status=$status" >> $GITHUB_OUTPUT
+          set +e
+          bash ./.github/scripts/go-fuzz-loop.sh ./internal/consensus/qbft ${QBFT_FUZZ_MINUTES} qbft-fuzz.out
+          rc=$?
+          if [ "$rc" -eq 0 ]; then echo "status=ok" >> $GITHUB_OUTPUT; else echo "status=fail" >> $GITHUB_OUTPUT; fi
       - name: Upload artifact
         if: always()
         uses: actions/upload-artifact@v4
@@ -141,26 +143,20 @@ jobs:
     continue-on-error: true
     outputs:
       status: ${{ steps.run.outputs.status }}
-    timeout-minutes: 90
+    timeout-minutes: 1500
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
         with:
           go-version: ${{ env.GO_VERSION }}
-      - name: Stress P2P + DKG suites
+      - name: Stress P2P + DKG suites (24h timeboxed)
         id: run
         shell: bash
         run: |
-          set -euo pipefail
-          loops=${P2P_LOOPS_LONG}
-          ok=1
-          : > p2p-dkg.out
-          for i in $(seq 1 "$loops"); do
-            echo "[run $i]" | tee -a p2p-dkg.out
-            if ! go test ./internal/p2p -race -count=1 -run . -timeout 5m | tee -a p2p-dkg.out; then ok=0; fi
-          done
-          if [ "$ok" -eq 1 ]; then status=ok; else status=fail; fi
-          echo "status=$status" >> $GITHUB_OUTPUT
+          set +e
+          bash ./.github/scripts/go-test-loop.sh ./internal/p2p ${P2P_MINUTES} p2p-dkg.out -race -run .
+          rc=$?
+          if [ "$rc" -eq 0 ]; then echo "status=ok" >> $GITHUB_OUTPUT; else echo "status=fail" >> $GITHUB_OUTPUT; fi
       - name: Upload artifact
         if: always()
         uses: actions/upload-artifact@v4
@@ -174,26 +170,20 @@ jobs:
     continue-on-error: true
     outputs:
       status: ${{ steps.run.outputs.status }}
-    timeout-minutes: 60
+    timeout-minutes: 1500
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
         with:
           go-version: ${{ env.GO_VERSION }}
-      - name: Stress FileStore
+      - name: Stress FileStore (24h timeboxed)
         id: run
         shell: bash
         run: |
-          set -euo pipefail
-          loops=${STATE_LOOPS_LONG}
-          ok=1
-          : > state-db.out
-          for i in $(seq 1 "$loops"); do
-            echo "[run $i]" | tee -a state-db.out
-            if ! go test ./internal/state -race -count=1 -run . -timeout 3m | tee -a state-db.out; then ok=0; fi
-          done
-          if [ "$ok" -eq 1 ]; then status=ok; else status=fail; fi
-          echo "status=$status" >> $GITHUB_OUTPUT
+          set +e
+          bash ./.github/scripts/go-test-loop.sh ./internal/state ${STATE_MINUTES} state-db.out -race -run .
+          rc=$?
+          if [ "$rc" -eq 0 ]; then echo "status=ok" >> $GITHUB_OUTPUT; else echo "status=fail" >> $GITHUB_OUTPUT; fi
       - name: Upload artifact
         if: always()
         uses: actions/upload-artifact@v4
@@ -207,7 +197,7 @@ jobs:
     continue-on-error: true
     outputs:
       status: ${{ steps.run.outputs.status }}
-    timeout-minutes: 90
+    timeout-minutes: 1500
     steps:
       - uses: actions/checkout@v4
       - name: Check Docker environment
