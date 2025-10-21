@@ -36,11 +36,26 @@ jobs:
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
+      - name: Check Docker environment
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker --version
+          docker info -f '{{.ServerVersion}}'
+          if docker compose version >/dev/null 2>&1; then
+            echo "DOCKER_COMPOSE=docker compose" >> $GITHUB_ENV
+          else
+            echo "docker compose v2 not found; installing docker-compose"
+            sudo apt-get update -y
+            sudo apt-get install -y docker-compose
+            docker-compose --version
+            echo "DOCKER_COMPOSE=docker-compose" >> $GITHUB_ENV
+          fi
       - name: Build and start 4-node cluster in background
         shell: bash
         run: |
           set -euo pipefail
-          docker compose up --build -d
+          ${DOCKER_COMPOSE} up --build -d
       - name: Run cluster health check
         id: health
         shell: bash
@@ -55,7 +70,7 @@ jobs:
         if: always()
         shell: bash
         run: |
-          docker compose ps
+          ${DOCKER_COMPOSE} ps || true
           for c in aequa-node-0 aequa-node-1 aequa-node-2 aequa-node-3; do docker logs $c --since 30m || true; done | tee cluster-health.out
       - name: Upload logs
         if: always()
@@ -65,7 +80,7 @@ jobs:
           path: cluster-health.out
       - name: Shutdown and clean up cluster
         if: always()
-        run: docker compose down -v
+        run: ${DOCKER_COMPOSE} down -v || true
   api-fuzz:
     name: api-fuzz (long)
     runs-on: ubuntu-latest
@@ -191,10 +206,25 @@ jobs:
     timeout-minutes: 90
     steps:
       - uses: actions/checkout@v4
+      - name: Check Docker environment
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker --version
+          docker info -f '{{.ServerVersion}}'
+          if docker compose version >/dev/null 2>&1; then
+            echo "DOCKER_COMPOSE=docker compose" >> $GITHUB_ENV
+          else
+            echo "docker compose v2 not found; installing docker-compose"
+            sudo apt-get update -y
+            sudo apt-get install -y docker-compose
+            docker-compose --version
+            echo "DOCKER_COMPOSE=docker-compose" >> $GITHUB_ENV
+          fi
       - name: Build image
         run: docker build -t aequa-local:latest .
       - name: Bring up cluster
-        run: docker compose up -d
+        run: ${DOCKER_COMPOSE} up -d
       - name: Probe and restart churn
         id: run
         shell: bash
@@ -227,7 +257,7 @@ jobs:
           path: chaos-e2e.out
       - name: Tear down
         if: always()
-        run: docker compose down -v
+        run: ${DOCKER_COMPOSE} down -v || true
 
   aggregate:
     name: aggregate-report
@@ -248,3 +278,4 @@ jobs:
           echo "| p2p-dkg | ${{ needs.p2p-dkg.outputs.status }} |" >> $GITHUB_STEP_SUMMARY
           echo "| state-db | ${{ needs.state-db.outputs.status }} |" >> $GITHUB_STEP_SUMMARY
           echo "| chaos-e2e | ${{ needs.chaos-e2e.outputs.status }} |" >> $GITHUB_STEP_SUMMARY
+
