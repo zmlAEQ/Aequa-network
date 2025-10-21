@@ -1,0 +1,195 @@
+name: m4-longrun
+
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: "Run mode (long|ultra)"
+        required: false
+        default: long
+  schedule:
+    # Weekends heavy run (Sat 01:00 UTC)
+    - cron: '0 1 * * 6'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: m4-longrun-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  GO_VERSION: '1.24'
+  API_FUZZ_TIME_LONG: '30m'
+  QBFT_FUZZ_TIME_LONG: '90m'
+  P2P_LOOPS_LONG: '40'
+  STATE_LOOPS_LONG: '20'
+  CHAOS_MINUTES_LONG: '60'
+
+jobs:
+  api-fuzz:
+    name: api-fuzz (long)
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with: { go-version: ${{ env.GO_VERSION }} }
+      - name: Run API fuzz
+        id: run
+        shell: bash
+        run: |
+          set -euo pipefail
+          time go test ./internal/api -run '^$' -fuzz=Fuzz -fuzztime=${API_FUZZ_TIME_LONG} | tee api-fuzz.out || true
+          if grep -q '\bfuzzing crashed\b\|panic:' api-fuzz.out; then status=fail; else status=ok; fi
+          echo "status=$status" >> $GITHUB_OUTPUT
+      - name: Upload artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: api-fuzz-logs
+          path: api-fuzz.out
+
+  qbft-fuzz:
+    name: qbft-fuzz (long)
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with: { go-version: ${{ env.GO_VERSION }} }
+      - name: Run QBFT fuzz
+        id: run
+        shell: bash
+        run: |
+          set -euo pipefail
+          time go test ./internal/consensus/qbft -run '^$' -fuzz=Fuzz -fuzztime=${QBFT_FUZZ_TIME_LONG} | tee qbft-fuzz.out || true
+          if grep -q '\bfuzzing crashed\b\|panic:' qbft-fuzz.out; then status=fail; else status=ok; fi
+          echo "status=$status" >> $GITHUB_OUTPUT
+      - name: Upload artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: qbft-fuzz-logs
+          path: qbft-fuzz.out
+
+  p2p-dkg:
+    name: p2p+dkg (long)
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with: { go-version: ${{ env.GO_VERSION }} }
+      - name: Stress P2P + DKG suites
+        id: run
+        shell: bash
+        run: |
+          set -euo pipefail
+          loops=${P2P_LOOPS_LONG}
+          ok=1
+          : > p2p-dkg.out
+          for i in $(seq 1 "$loops"); do
+            echo "[run $i]" | tee -a p2p-dkg.out
+            if ! go test ./internal/p2p -race -count=1 -run . -timeout 5m | tee -a p2p-dkg.out; then ok=0; fi
+          done
+          if [ "$ok" -eq 1 ]; then status=ok; else status=fail; fi
+          echo "status=$status" >> $GITHUB_OUTPUT
+      - name: Upload artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: p2p-dkg-logs
+          path: p2p-dkg.out
+
+  state-db:
+    name: state-db (long)
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with: { go-version: ${{ env.GO_VERSION }} }
+      - name: Stress FileStore
+        id: run
+        shell: bash
+        run: |
+          set -euo pipefail
+          loops=${STATE_LOOPS_LONG}
+          ok=1
+          : > state-db.out
+          for i in $(seq 1 "$loops"); do
+            echo "[run $i]" | tee -a state-db.out
+            if ! go test ./internal/state -race -count=1 -run . -timeout 3m | tee -a state-db.out; then ok=0; fi
+          done
+          if [ "$ok" -eq 1 ]; then status=ok; else status=fail; fi
+          echo "status=$status" >> $GITHUB_OUTPUT
+      - name: Upload artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: state-db-logs
+          path: state-db.out
+
+  chaos-e2e:
+    name: chaos-e2e (long)
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build image
+        run: docker build -t aequa-local:latest .
+      - name: Bring up cluster
+        run: docker compose up -d
+      - name: Probe and restart churn
+        id: run
+        shell: bash
+        run: |
+          set -euo pipefail
+          minutes=${CHAOS_MINUTES_LONG}
+          end=$(( $(date +%s) + minutes*60 ))
+          ok=1
+          : > chaos-e2e.out
+          while [ $(date +%s) -lt $end ]; do
+            for i in 0 1 2 3; do
+              if ! curl -fsS localhost:$((4620+i))>/dev/null; then ok=0; echo "metrics probe fail on node $i" | tee -a chaos-e2e.out; fi
+            done
+            n=$((RANDOM % 4))
+            docker compose restart aequa-node-$n || true
+            sleep 10
+          done
+          if [ "$ok" -eq 1 ]; then status=ok; else status=fail; fi
+          echo "status=$status" >> $GITHUB_OUTPUT
+      - name: Collect container logs
+        if: always()
+        shell: bash
+        run: |
+          for c in aequa-node-0 aequa-node-1 aequa-node-2 aequa-node-3; do docker logs $c --since 1h || true; done | tee chaos-e2e.out
+      - name: Upload artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: chaos-e2e-logs
+          path: chaos-e2e.out
+      - name: Tear down
+        if: always()
+        run: docker compose down -v
+
+  aggregate:
+    name: aggregate-report
+    runs-on: ubuntu-latest
+    needs: [api-fuzz, qbft-fuzz, p2p-dkg, state-db, chaos-e2e]
+    if: always()
+    steps:
+      - name: Build summary
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "# M4 Long-run Summary" >> $GITHUB_STEP_SUMMARY
+          echo "\n| Suite | Status |" >> $GITHUB_STEP_SUMMARY
+          echo "|---|---|" >> $GITHUB_STEP_SUMMARY
+          echo "| api-fuzz | ${{ needs.api-fuzz.outputs.status }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| qbft-fuzz | ${{ needs.qbft-fuzz.outputs.status }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| p2p-dkg | ${{ needs.p2p-dkg.outputs.status }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| state-db | ${{ needs.state-db.outputs.status }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| chaos-e2e | ${{ needs.chaos-e2e.outputs.status }} |" >> $GITHUB_STEP_SUMMARY
