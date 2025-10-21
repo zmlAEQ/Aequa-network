@@ -9,6 +9,7 @@ import (
     mrand "math/rand"
     "net/http"
     "os"
+    "strconv"
     "strings"
     "time"
 )
@@ -60,7 +61,9 @@ func main() {
     idSpace := os.Getenv("P2P_ID_PREFIX")
     if idSpace == "" { idSpace = "X" }
     maxIDs := 1024
-    if v := os.Getenv("P2P_MAX_IDS"); v != "" { if n, err := fmt.Sscan(v, &maxIDs); err == nil && n == 1 && maxIDs > 0 { /* ok */ } }
+    if v := os.Getenv("P2P_MAX_IDS"); v != "" {
+        if n, err := strconv.Atoi(v); err == nil && n > 0 { maxIDs = n }
+    }
 
     // Start goroutine: qbft adversarial injection
     go func() {
@@ -127,4 +130,3 @@ func splitNonEmpty(s string) []string {
     for _, p := range parts { p = strings.TrimSpace(p); if p != "" { out = append(out, p) } }
     return out
 }
-
