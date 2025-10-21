@@ -46,12 +46,11 @@ func (s *Service) Start(ctx context.Context) error {
         for {
             select {
             case ev := <-s.sub:
-                start := time.Now()
-                // Audit log + metrics for event intake
-                dur := time.Since(start)
-                logger.InfoJ("consensus_recv", map[string]any{"kind": string(ev.Kind), "trace_id": ev.TraceID, "result": "recv", "latency_ms": dur.Milliseconds()})
+                // Count the event as received
                 metrics.Inc("consensus_events_total", map[string]string{"kind": string(ev.Kind)})
-                metrics.ObserveSummary("consensus_proc_ms", map[string]string{"kind": string(ev.Kind)}, float64(dur.Milliseconds()))
+
+                // Measure full processing time: verify -> state -> persist
+                begin := time.Now()
                 // Map event to qbft message via adapter
                 msg := MapEventToQBFT(ev)
                 if err := s.v.Verify(msg); err == nil {
@@ -62,6 +61,10 @@ func (s *Service) Start(ctx context.Context) error {
                         logger.InfoJ("consensus_state", map[string]any{"op":"save", "result":"ok", "height": msg.Height, "round": msg.Round})
                     }
                 }
+                durMs := time.Since(begin).Milliseconds()
+                // Audit log and summary with the full processing latency; labels unchanged
+                logger.InfoJ("consensus_recv", map[string]any{"kind": string(ev.Kind), "trace_id": ev.TraceID, "result": "recv", "latency_ms": durMs})
+                metrics.ObserveSummary("consensus_proc_ms", map[string]string{"kind": string(ev.Kind)}, float64(durMs))
             case <-ctx.Done():
                 return
             }
