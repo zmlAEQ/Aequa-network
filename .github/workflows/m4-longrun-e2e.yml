@@ -1,0 +1,170 @@
+name: m4-longrun-e2e
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: m4-longrun-e2e-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  GO_VERSION: '1.24'
+  CHUNK_MIN: '360' # 6 hours per chunk
+
+jobs:
+  cluster-health:
+    name: cluster-health (bootstrap)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check docker compose
+        run: |
+          docker --version
+          if docker compose version >/dev/null 2>&1; then echo DOCKER_COMPOSE="docker compose" >> $GITHUB_ENV; else sudo apt-get update -y && sudo apt-get install -y docker-compose && echo DOCKER_COMPOSE="docker-compose" >> $GITHUB_ENV; fi
+      - name: Build e2e-enabled image
+        run: docker build --build-arg BUILD_TAGS=e2e -t aequa-local:latest .
+      - name: Bring up 4-node cluster
+        run: ${{ env.DOCKER_COMPOSE }} up -d
+      - name: Health check (120s warm-up)
+        run: |
+          export WAIT_SECS=120
+          bash ./.github/scripts/m4-health-check.sh
+      - name: Tear down
+        if: always()
+        run: ${{ env.DOCKER_COMPOSE }} down -v || true
+
+  chaos-e2e-c1:
+    name: chaos-e2e chunk 1/4 (6h + attacker)
+    runs-on: ubuntu-latest
+    timeout-minutes: 370
+    steps:
+      - uses: actions/checkout@v4
+      - name: Prepare docker compose
+        run: |
+          if docker compose version >/dev/null 2>&1; then echo DOCKER_COMPOSE="docker compose" >> $GITHUB_ENV; else sudo apt-get update -y && sudo apt-get install -y docker-compose && echo DOCKER_COMPOSE="docker-compose" >> $GITHUB_ENV; fi
+      - name: Build e2e image
+        run: docker build --build-arg BUILD_TAGS=e2e -t aequa-local:latest .
+      - name: Up cluster
+        run: ${{ env.DOCKER_COMPOSE }} up -d
+      - name: Run attacker and churn
+        shell: bash
+        run: |
+          minutes=${CHUNK_MIN}
+          end=$(( $(date +%s) + minutes*60 ))
+          export ENDPOINTS="http://127.0.0.1:4610,http://127.0.0.1:4611,http://127.0.0.1:4612,http://127.0.0.1:4613"
+          timeout ${CHUNK_MIN}m go run ./test/attacker > attacker-c1.out 2>&1 & echo $! > attacker.pid
+          : > chaos-e2e-c1.out
+          while [ $(date +%s) -lt $end ]; do
+            for i in 0 1 2 3; do curl -fsS localhost:$((4620+i))>/dev/null || echo "metrics fail on node $i" | tee -a chaos-e2e-c1.out; done
+            n=$((RANDOM % 4)); ${{ env.DOCKER_COMPOSE }} restart aequa-node-$n || true
+            sleep 10
+          done
+      - name: Collect logs & down
+        if: always()
+        run: |
+          if [ -f attacker.pid ]; then kill $(cat attacker.pid) 2>/dev/null || true; fi
+          for c in aequa-node-0 aequa-node-1 aequa-node-2 aequa-node-3; do docker logs $c --since 6h || true; done | tee chaos-e2e-c1.out
+          cat attacker-c1.out >> chaos-e2e-c1.out || true
+          ${{ env.DOCKER_COMPOSE }} down -v || true
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: chaos-e2e-c1-logs
+          path: chaos-e2e-c1.out
+
+  chaos-e2e-c2:
+    name: chaos-e2e chunk 2/4 (6h + attacker)
+    runs-on: ubuntu-latest
+    needs: [chaos-e2e-c1]
+    timeout-minutes: 370
+    steps:
+      - uses: actions/checkout@v4
+      - run: |
+          if docker compose version >/dev/null 2>&1; then echo DOCKER_COMPOSE="docker compose" >> $GITHUB_ENV; else sudo apt-get update -y && sudo apt-get install -y docker-compose && echo DOCKER_COMPOSE="docker-compose" >> $GITHUB_ENV; fi
+      - run: docker build --build-arg BUILD_TAGS=e2e -t aequa-local:latest .
+      - run: ${{ env.DOCKER_COMPOSE }} up -d
+      - name: Run attacker and churn
+        run: |
+          minutes=${CHUNK_MIN}; end=$(( $(date +%s) + minutes*60 )); export ENDPOINTS="http://127.0.0.1:4610,http://127.0.0.1:4611,http://127.0.0.1:4612,http://127.0.0.1:4613"; timeout ${CHUNK_MIN}m go run ./test/attacker > attacker-c2.out 2>&1 & echo $! > attacker.pid; : > chaos-e2e-c2.out; while [ $(date +%s) -lt $end ]; do for i in 0 1 2 3; do curl -fsS localhost:$((4620+i))>/dev/null || echo "metrics fail on node $i" | tee -a chaos-e2e-c2.out; done; n=$((RANDOM % 4)); ${{ env.DOCKER_COMPOSE }} restart aequa-node-$n || true; sleep 10; done
+      - name: Collect logs & down
+        if: always()
+        run: |
+          if [ -f attacker.pid ]; then kill $(cat attacker.pid) 2>/dev/null || true; fi
+          for c in aequa-node-0 aequa-node-1 aequa-node-2 aequa-node-3; do docker logs $c --since 6h || true; done | tee chaos-e2e-c2.out
+          cat attacker-c2.out >> chaos-e2e-c2.out || true
+          ${{ env.DOCKER_COMPOSE }} down -v || true
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: chaos-e2e-c2-logs
+          path: chaos-e2e-c2.out
+
+  chaos-e2e-c3:
+    name: chaos-e2e chunk 3/4 (6h + attacker)
+    runs-on: ubuntu-latest
+    needs: [chaos-e2e-c2]
+    timeout-minutes: 370
+    steps:
+      - uses: actions/checkout@v4
+      - run: |
+          if docker compose version >/dev/null 2>&1; then echo DOCKER_COMPOSE="docker compose" >> $GITHUB_ENV; else sudo apt-get update -y && sudo apt-get install -y docker-compose && echo DOCKER_COMPOSE="docker-compose" >> $GITHUB_ENV; fi
+      - run: docker build --build-arg BUILD_TAGS=e2e -t aequa-local:latest .
+      - run: ${{ env.DOCKER_COMPOSE }} up -d
+      - name: Run attacker and churn
+        run: |
+          minutes=${CHUNK_MIN}; end=$(( $(date +%s) + minutes*60 )); export ENDPOINTS="http://127.0.0.1:4610,http://127.0.0.1:4611,http://127.0.0.1:4612,http://127.0.0.1:4613"; timeout ${CHUNK_MIN}m go run ./test/attacker > attacker-c3.out 2>&1 & echo $! > attacker.pid; : > chaos-e2e-c3.out; while [ $(date +%s) -lt $end ]; do for i in 0 1 2 3; do curl -fsS localhost:$((4620+i))>/dev/null || echo "metrics fail on node $i" | tee -a chaos-e2e-c3.out; done; n=$((RANDOM % 4)); ${{ env.DOCKER_COMPOSE }} restart aequa-node-$n || true; sleep 10; done
+      - name: Collect logs & down
+        if: always()
+        run: |
+          if [ -f attacker.pid ]; then kill $(cat attacker.pid) 2>/dev/null || true; fi
+          for c in aequa-node-0 aequa-node-1 aequa-node-2 aequa-node-3; do docker logs $c --since 6h || true; done | tee chaos-e2e-c3.out
+          cat attacker-c3.out >> chaos-e2e-c3.out || true
+          ${{ env.DOCKER_COMPOSE }} down -v || true
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: chaos-e2e-c3-logs
+          path: chaos-e2e-c3.out
+
+  chaos-e2e-c4:
+    name: chaos-e2e chunk 4/4 (6h + attacker)
+    runs-on: ubuntu-latest
+    needs: [chaos-e2e-c3]
+    timeout-minutes: 370
+    steps:
+      - uses: actions/checkout@v4
+      - run: |
+          if docker compose version >/dev/null 2>&1; then echo DOCKER_COMPOSE="docker compose" >> $GITHUB_ENV; else sudo apt-get update -y && sudo apt-get install -y docker-compose && echo DOCKER_COMPOSE="docker-compose" >> $GITHUB_ENV; fi
+      - run: docker build --build-arg BUILD_TAGS=e2e -t aequa-local:latest .
+      - run: ${{ env.DOCKER_COMPOSE }} up -d
+      - name: Run attacker and churn
+        run: |
+          minutes=${CHUNK_MIN}; end=$(( $(date +%s) + minutes*60 )); export ENDPOINTS="http://127.0.0.1:4610,http://127.0.0.1:4611,http://127.0.0.1:4612,http://127.0.0.1:4613"; timeout ${CHUNK_MIN}m go run ./test/attacker > attacker-c4.out 2>&1 & echo $! > attacker.pid; : > chaos-e2e-c4.out; while [ $(date +%s) -lt $end ]; do for i in 0 1 2 3; do curl -fsS localhost:$((4620+i))>/dev/null || echo "metrics fail on node $i" | tee -a chaos-e2e-c4.out; done; n=$((RANDOM % 4)); ${{ env.DOCKER_COMPOSE }} restart aequa-node-$n || true; sleep 10; done
+      - name: Collect logs & down
+        if: always()
+        run: |
+          if [ -f attacker.pid ]; then kill $(cat attacker.pid) 2>/dev/null || true; fi
+          for c in aequa-node-0 aequa-node-1 aequa-node-2 aequa-node-3; do docker logs $c --since 6h || true; done | tee chaos-e2e-c4.out
+          cat attacker-c4.out >> chaos-e2e-c4.out || true
+          ${{ env.DOCKER_COMPOSE }} down -v || true
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: chaos-e2e-c4-logs
+          path: chaos-e2e-c4.out
+
+  aggregate:
+    name: aggregate-report
+    runs-on: ubuntu-latest
+    needs: [cluster-health, chaos-e2e-c4]
+    if: always()
+    steps:
+      - name: Build summary
+        run: |
+          echo "# M4 E2E Attack Long-run (4×6h)" >> $GITHUB_STEP_SUMMARY
+          echo "\nArtifacts contain attacker+node logs per chunk." >> $GITHUB_STEP_SUMMARY
+

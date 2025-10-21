@@ -35,6 +35,8 @@ func (s *Service) Start(ctx context.Context) error {
     if s.v == nil { s.v = qbft.NewBasicVerifierWithPolicy(qbft.DefaultPolicy()) }
     if s.store == nil { s.store = state.NewMemoryStore() }
     if s.st == nil { s.st = &qbft.State{} }
+    // Start E2E attack/testing endpoint when built with tag "e2e" (no-op otherwise).
+    startE2E(s)
     if ls, err := s.store.LoadLastState(ctx); err != nil {
         logger.InfoJ("consensus_state", map[string]any{"op":"load", "result":"miss", "err": err.Error()})
     } else {
