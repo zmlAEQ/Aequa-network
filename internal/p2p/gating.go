@@ -43,6 +43,33 @@ func (g *AllowListGate) Remove(id PeerID) { g.mu.Lock(); delete(g.allowed, id); 
 // ReasonedGate optionally returns a reason when denying a peer.
 type ReasonedGate interface { AllowWithReason(id PeerID) (bool, string) }
 
+// CombinedGate composes multiple gates and enforces them in a fixed order:
+// AllowList -> RateLimit -> Score. It normalizes denial reasons to keep
+// metrics dimensions stable: "denied" for allowlist/score, "limited" for rate.
+type CombinedGate struct{
+    allow *AllowListGate
+    rate  *RateLimitGate
+    score *ScoreGate
+}
+
+func (g *CombinedGate) Allow(id PeerID) bool { ok, _ := g.AllowWithReason(id); return ok }
+
+func (g *CombinedGate) AllowWithReason(id PeerID) (bool, string) {
+    // AllowList first
+    if g != nil && g.allow != nil {
+        if !g.allow.Allow(id) { return false, "denied" }
+    }
+    // Rate limiting next
+    if g != nil && g.rate != nil {
+        if ok, _ := g.rate.AllowWithReason(id); !ok { return false, "limited" }
+    }
+    // Score threshold last
+    if g != nil && g.score != nil {
+        if ok, _ := g.score.AllowWithReason(id); !ok { return false, "denied" }
+    }
+    return true, "allowed"
+}
+
 // RateLimitGate allows only a fixed number of connections (process-wide stub).
 type RateLimitGate struct{ remain int64 }
 

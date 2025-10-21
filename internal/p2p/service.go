@@ -39,6 +39,37 @@ func (s *Service) Start(ctx context.Context) error {
     }
     metrics.Inc("p2p_config_checks_total", map[string]string{"result":"ok"})
 
+    // Apply config to Gate pipeline: AllowList -> Rate -> Score (normalized reasons)
+    // If none configured, keep AllowAll behaviour.
+    {
+        var cg *CombinedGate
+        // AllowList
+        if len(s.cfg.AllowList) > 0 {
+            if cg == nil { cg = &CombinedGate{} }
+            cg.allow = NewAllowListGate(s.cfg.AllowList...)
+        }
+        // RateLimit
+        if s.cfg.RateLimit > 0 {
+            if cg == nil { cg = &CombinedGate{} }
+            rl := NewRateLimitGate(s.cfg.RateLimit)
+            cg.rate = &rl
+        }
+        // ScoreThreshold (no scores map provided at this layer)
+        if s.cfg.ScoreThreshold > 0 {
+            if cg == nil { cg = &CombinedGate{} }
+            sg := NewScoreGate(s.cfg.ScoreThreshold, nil)
+            cg.score = &sg
+        }
+        if cg != nil {
+            s.gate = cg
+        }
+    }
+
+    // Apply resource limits from config
+    if s.rman == nil || s.rman.limits.MaxConns != s.cfg.MaxConns {
+        s.rman = NewResourceManager(ResourceLimits{MaxConns: s.cfg.MaxConns})
+    }
+
     // DKG/cluster-lock verification (fail-fast)
     if s.dkgv != nil {
         if err := s.dkgv.VerifyCluster(); err != nil {
