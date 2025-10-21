@@ -46,6 +46,7 @@ func (s *State) Process(msg Message) error {
                 "reason":    "unauthorized_leader",
                 "from":      msg.From,
                 "expect":    s.Leader,
+                "trace_id":  msg.TraceID,
             })
             return fmt.Errorf("unauthorized leader")
         }
@@ -63,6 +64,7 @@ func (s *State) Process(msg Message) error {
                 "height":    s.Height,
                 "round":     s.Round,
                 "reason":    "not_preprepared",
+                "trace_id":  msg.TraceID,
             })
             return fmt.Errorf("prepare before preprepared")
         }
@@ -75,6 +77,7 @@ func (s *State) Process(msg Message) error {
                 "reason":    "proposal_mismatch",
                 "got":       msg.ID,
                 "expect":    s.proposalID,
+                "trace_id":  msg.TraceID,
             })
             return fmt.Errorf("proposal mismatch")
         }
@@ -101,6 +104,7 @@ func (s *State) Process(msg Message) error {
                 "height":    s.Height,
                 "round":     s.Round,
                 "reason":    "not_prepared",
+                "trace_id":  msg.TraceID,
             })
             return fmt.Errorf("commit before prepared")
         }
@@ -113,6 +117,7 @@ func (s *State) Process(msg Message) error {
                 "reason":    "proposal_mismatch",
                 "got":       msg.ID,
                 "expect":    s.proposalID,
+                "trace_id":  msg.TraceID,
             })
             return fmt.Errorf("proposal mismatch")
         }
@@ -140,6 +145,7 @@ END:
             "height":    s.Height,
             "round":     s.Round,
             "phase":     s.Phase,
+            "trace_id":  msg.TraceID,
         })
     } else {
         logger.InfoJ("qbft_state", map[string]any{
@@ -149,6 +155,7 @@ END:
             "round":     s.Round,
             "phase":     s.Phase,
             "note":      "noop",
+            "trace_id":  msg.TraceID,
         })
     }
     metrics.Inc("qbft_state_transitions_total", map[string]string{"type": string(msg.Type)})

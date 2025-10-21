@@ -109,41 +109,41 @@ func (v *BasicVerifier) Verify(msg Message) error {
     // structural checks
     if msg.ID == "" || msg.From == "" || !validType(msg.Type) {
         metrics.Inc("qbft_msg_verified_total", map[string]string{"result":"error"})
-        logger.ErrorJ("qbft_verify", map[string]any{"result":"error", "reason":"invalid", "type": string(msg.Type)})
+        logger.ErrorJ("qbft_verify", map[string]any{"result":"error", "reason":"invalid", "type": string(msg.Type), "trace_id": msg.TraceID})
         return fmt.Errorf("invalid message")
     }
     // optional sender whitelist
     if len(v.allowed) > 0 {
         if _, ok := v.allowed[msg.From]; !ok {
             metrics.Inc("qbft_msg_verified_total", map[string]string{"result":"unauthorized"})
-            logger.ErrorJ("qbft_verify", map[string]any{"result":"unauthorized", "from": msg.From, "type": string(msg.Type)})
+            logger.ErrorJ("qbft_verify", map[string]any{"result":"unauthorized", "from": msg.From, "type": string(msg.Type), "trace_id": msg.TraceID})
             return fmt.Errorf("unauthorized")
         }
     }
     // signature shape placeholder (no crypto)
     if l := len(msg.Sig); l > 0 && l < 32 {
         metrics.Inc("qbft_msg_verified_total", map[string]string{"result":"sig_invalid"})
-        logger.ErrorJ("qbft_verify", map[string]any{"result":"sig_invalid", "type": string(msg.Type)})
+        logger.ErrorJ("qbft_verify", map[string]any{"result":"sig_invalid", "type": string(msg.Type), "trace_id": msg.TraceID})
         return fmt.Errorf("sig invalid")
     }
     // context semantic: preprepare must have round == 0 (placeholder constraint)
     if msg.Type == MsgPreprepare {
         if msg.Round != 0 {
             metrics.Inc("qbft_msg_verified_total", map[string]string{"result":"error"})
-            logger.ErrorJ("qbft_verify", map[string]any{"result":"error", "reason":"round_semantic", "type": string(msg.Type), "round": msg.Round})
+            logger.ErrorJ("qbft_verify", map[string]any{"result":"error", "reason":"round_semantic", "type": string(msg.Type), "round": msg.Round, "trace_id": msg.TraceID})
             return fmt.Errorf("invalid round for preprepare")
         }
     }
     // height window (old height)
     if v.minHeight > 0 && msg.Height < v.minHeight {
         metrics.Inc("qbft_msg_verified_total", map[string]string{"result":"old"})
-        logger.ErrorJ("qbft_verify", map[string]any{"result":"old", "height": msg.Height, "min": v.minHeight, "type": string(msg.Type)})
+        logger.ErrorJ("qbft_verify", map[string]any{"result":"old", "height": msg.Height, "min": v.minHeight, "type": string(msg.Type), "trace_id": msg.TraceID})
         return fmt.Errorf("old height")
     }
     // round window (upper bound)
     if v.roundWindow > 0 && msg.Round > v.roundWindow {
         metrics.Inc("qbft_msg_verified_total", map[string]string{"result":"round_oob"})
-        logger.ErrorJ("qbft_verify", map[string]any{"result":"round_oob", "round": msg.Round, "max": v.roundWindow, "type": string(msg.Type)})
+        logger.ErrorJ("qbft_verify", map[string]any{"result":"round_oob", "round": msg.Round, "max": v.roundWindow, "type": string(msg.Type), "trace_id": msg.TraceID})
         return fmt.Errorf("round out of bound")
     }
     // anti-replay: prefer height-windowed replay if configured; otherwise id-level replay
@@ -151,13 +151,13 @@ func (v *BasicVerifier) Verify(msg Message) error {
         if v.replayWindow > 0 {
             if v.replay.SeenWithin(msg.ID, msg.Height, v.replayWindow) {
                 metrics.Inc("qbft_msg_verified_total", map[string]string{"result":"replay"})
-                logger.ErrorJ("qbft_verify", map[string]any{"result":"replay", "id": msg.ID, "type": string(msg.Type), "window": v.replayWindow})
+                logger.ErrorJ("qbft_verify", map[string]any{"result":"replay", "id": msg.ID, "type": string(msg.Type), "window": v.replayWindow, "trace_id": msg.TraceID})
                 return fmt.Errorf("replay")
             }
         } else {
             if v.replay.Seen(msg.ID) {
                 metrics.Inc("qbft_msg_verified_total", map[string]string{"result":"replay"})
-                logger.ErrorJ("qbft_verify", map[string]any{"result":"replay", "id": msg.ID, "type": string(msg.Type)})
+                logger.ErrorJ("qbft_verify", map[string]any{"result":"replay", "id": msg.ID, "type": string(msg.Type), "trace_id": msg.TraceID})
                 return fmt.Errorf("replay")
             }
         }
@@ -168,7 +168,7 @@ func (v *BasicVerifier) Verify(msg Message) error {
     if msg.Type == MsgPreprepare {
         if msg.Round != 0 {
             metrics.Inc("qbft_msg_verified_total", map[string]string{"result":"error"})
-            logger.ErrorJ("qbft_verify", map[string]any{"result":"error", "reason":"round_semantic", "type": string(msg.Type), "round": msg.Round})
+            logger.ErrorJ("qbft_verify", map[string]any{"result":"error", "reason":"round_semantic", "type": string(msg.Type), "round": msg.Round, "trace_id": msg.TraceID})
             return fmt.Errorf("invalid round for preprepare")
         }
     }
@@ -176,7 +176,7 @@ func (v *BasicVerifier) Verify(msg Message) error {
     if msg.Type == MsgPrepare || msg.Type == MsgCommit {
         if msg.Round < 1 {
             metrics.Inc("qbft_msg_verified_total", map[string]string{"result":"error"})
-            logger.ErrorJ("qbft_verify", map[string]any{"result":"error", "reason":"round_semantic", "type": string(msg.Type), "round": msg.Round})
+            logger.ErrorJ("qbft_verify", map[string]any{"result":"error", "reason":"round_semantic", "type": string(msg.Type), "round": msg.Round, "trace_id": msg.TraceID})
             return fmt.Errorf("invalid round for %s", msg.Type)
         }
     }
@@ -185,21 +185,21 @@ func (v *BasicVerifier) Verify(msg Message) error {
     if v.typeMinHeight != nil {
         if min, ok := v.typeMinHeight[msg.Type]; ok && min > 0 && msg.Height < min {
             metrics.Inc("qbft_msg_verified_total", map[string]string{"result":"old"})
-            logger.ErrorJ("qbft_verify", map[string]any{"result":"old", "reason":"type_height_old", "type": string(msg.Type), "height": msg.Height, "min": min})
+            logger.ErrorJ("qbft_verify", map[string]any{"result":"old", "reason":"type_height_old", "type": string(msg.Type), "height": msg.Height, "min": min, "trace_id": msg.TraceID})
             return fmt.Errorf("type-scoped old height")
         }
     }
     if v.typeRoundMax != nil {
         if max, ok := v.typeRoundMax[msg.Type]; ok && max > 0 && msg.Round > max {
             metrics.Inc("qbft_msg_verified_total", map[string]string{"result":"round_oob"})
-            logger.ErrorJ("qbft_verify", map[string]any{"result":"round_oob", "reason":"type_round_oob", "type": string(msg.Type), "round": msg.Round, "max": max})
+            logger.ErrorJ("qbft_verify", map[string]any{"result":"round_oob", "reason":"type_round_oob", "type": string(msg.Type), "round": msg.Round, "max": max, "trace_id": msg.TraceID})
             return fmt.Errorf("type-scoped round out of bound")
         }
     }
     // id-level anti-replay handled above when window is disabled
     // ok
     metrics.Inc("qbft_msg_verified_total", labels)
-    logger.InfoJ("qbft_verify", map[string]any{"result":"ok", "id": msg.ID, "type": string(msg.Type)})
+    logger.InfoJ("qbft_verify", map[string]any{"result":"ok", "id": msg.ID, "type": string(msg.Type), "trace_id": msg.TraceID})
     return nil
 }
 
