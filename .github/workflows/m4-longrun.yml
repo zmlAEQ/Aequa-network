@@ -1,0 +1,489 @@
+name: m4-longrun
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '0 1 * * 6'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: m4-longrun-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  GO_VERSION: '1.24'
+  CHUNKS: '4'
+  CHUNK_MIN: '360' # 6 hours per chunk
+
+jobs:
+  cluster-health:
+    name: cluster-health (bootstrap)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check Docker environment
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker --version
+          docker info -f '{{.ServerVersion}}'
+          if docker compose version >/dev/null 2>&1; then
+            echo "DOCKER_COMPOSE=docker compose" >> $GITHUB_ENV
+          else
+            sudo apt-get update -y
+            sudo apt-get install -y docker-compose
+            echo "DOCKER_COMPOSE=docker-compose" >> $GITHUB_ENV
+          fi
+      - name: Build and start 4-node cluster in background
+        shell: bash
+        run: |
+          set -euo pipefail
+          ${DOCKER_COMPOSE} up --build -d
+      - name: Run cluster health check (wait 120s)
+        shell: bash
+        run: |
+          export WAIT_SECS=120
+          bash ./.github/scripts/m4-health-check.sh
+      - name: Shutdown and clean up cluster
+        if: always()
+        run: ${DOCKER_COMPOSE} down -v || true
+
+  api-fuzz-c1:
+    name: api-fuzz chunk 1/4 (6h)
+    runs-on: ubuntu-latest
+    timeout-minutes: 370
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+      - name: Run API fuzz (chunk)
+        shell: bash
+        run: |
+          bash ./.github/scripts/go-fuzz-loop.sh ./internal/api ${{ env.CHUNK_MIN }} api-fuzz-c1.out || true
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: api-fuzz-c1-logs
+          path: api-fuzz-c1.out
+
+  api-fuzz-c2:
+    name: api-fuzz chunk 2/4 (6h)
+    runs-on: ubuntu-latest
+    needs: [api-fuzz-c1]
+    timeout-minutes: 370
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+      - name: Run API fuzz (chunk)
+        run: bash ./.github/scripts/go-fuzz-loop.sh ./internal/api ${{ env.CHUNK_MIN }} api-fuzz-c2.out || true
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: api-fuzz-c2-logs
+          path: api-fuzz-c2.out
+
+  api-fuzz-c3:
+    name: api-fuzz chunk 3/4 (6h)
+    runs-on: ubuntu-latest
+    needs: [api-fuzz-c2]
+    timeout-minutes: 370
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+      - name: Run API fuzz (chunk)
+        run: bash ./.github/scripts/go-fuzz-loop.sh ./internal/api ${{ env.CHUNK_MIN }} api-fuzz-c3.out || true
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: api-fuzz-c3-logs
+          path: api-fuzz-c3.out
+
+  api-fuzz-c4:
+    name: api-fuzz chunk 4/4 (6h)
+    runs-on: ubuntu-latest
+    needs: [api-fuzz-c3]
+    timeout-minutes: 370
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+      - name: Run API fuzz (chunk)
+        run: bash ./.github/scripts/go-fuzz-loop.sh ./internal/api ${{ env.CHUNK_MIN }} api-fuzz-c4.out || true
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: api-fuzz-c4-logs
+          path: api-fuzz-c4.out
+
+  qbft-fuzz-c1:
+    name: qbft-fuzz chunk 1/4 (6h)
+    runs-on: ubuntu-latest
+    timeout-minutes: 370
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+      - name: Run QBFT fuzz (chunk)
+        run: bash ./.github/scripts/go-fuzz-loop.sh ./internal/consensus/qbft ${{ env.CHUNK_MIN }} qbft-fuzz-c1.out || true
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: qbft-fuzz-c1-logs
+          path: qbft-fuzz-c1.out
+
+  qbft-fuzz-c2:
+    name: qbft-fuzz chunk 2/4 (6h)
+    runs-on: ubuntu-latest
+    needs: [qbft-fuzz-c1]
+    timeout-minutes: 370
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+      - name: Run QBFT fuzz (chunk)
+        run: bash ./.github/scripts/go-fuzz-loop.sh ./internal/consensus/qbft ${{ env.CHUNK_MIN }} qbft-fuzz-c2.out || true
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: qbft-fuzz-c2-logs
+          path: qbft-fuzz-c2.out
+
+  qbft-fuzz-c3:
+    name: qbft-fuzz chunk 3/4 (6h)
+    runs-on: ubuntu-latest
+    needs: [qbft-fuzz-c2]
+    timeout-minutes: 370
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+      - name: Run QBFT fuzz (chunk)
+        run: bash ./.github/scripts/go-fuzz-loop.sh ./internal/consensus/qbft ${{ env.CHUNK_MIN }} qbft-fuzz-c3.out || true
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: qbft-fuzz-c3-logs
+          path: qbft-fuzz-c3.out
+
+  qbft-fuzz-c4:
+    name: qbft-fuzz chunk 4/4 (6h)
+    runs-on: ubuntu-latest
+    needs: [qbft-fuzz-c3]
+    timeout-minutes: 370
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+      - name: Run QBFT fuzz (chunk)
+        run: bash ./.github/scripts/go-fuzz-loop.sh ./internal/consensus/qbft ${{ env.CHUNK_MIN }} qbft-fuzz-c4.out || true
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: qbft-fuzz-c4-logs
+          path: qbft-fuzz-c4.out
+
+  p2p-dkg-c1:
+    name: p2p+dkg chunk 1/4 (6h)
+    runs-on: ubuntu-latest
+    timeout-minutes: 370
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+      - name: Stress P2P + DKG (chunk)
+        run: bash ./.github/scripts/go-test-loop.sh ./internal/p2p ${{ env.CHUNK_MIN }} p2p-dkg-c1.out -race -run . || true
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: p2p-dkg-c1-logs
+          path: p2p-dkg-c1.out
+
+  p2p-dkg-c2:
+    name: p2p+dkg chunk 2/4 (6h)
+    runs-on: ubuntu-latest
+    needs: [p2p-dkg-c1]
+    timeout-minutes: 370
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+      - name: Stress P2P + DKG (chunk)
+        run: bash ./.github/scripts/go-test-loop.sh ./internal/p2p ${{ env.CHUNK_MIN }} p2p-dkg-c2.out -race -run . || true
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: p2p-dkg-c2-logs
+          path: p2p-dkg-c2.out
+
+  p2p-dkg-c3:
+    name: p2p+dkg chunk 3/4 (6h)
+    runs-on: ubuntu-latest
+    needs: [p2p-dkg-c2]
+    timeout-minutes: 370
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+      - name: Stress P2P + DKG (chunk)
+        run: bash ./.github/scripts/go-test-loop.sh ./internal/p2p ${{ env.CHUNK_MIN }} p2p-dkg-c3.out -race -run . || true
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: p2p-dkg-c3-logs
+          path: p2p-dkg-c3.out
+
+  p2p-dkg-c4:
+    name: p2p+dkg chunk 4/4 (6h)
+    runs-on: ubuntu-latest
+    needs: [p2p-dkg-c3]
+    timeout-minutes: 370
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+      - name: Stress P2P + DKG (chunk)
+        run: bash ./.github/scripts/go-test-loop.sh ./internal/p2p ${{ env.CHUNK_MIN }} p2p-dkg-c4.out -race -run . || true
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: p2p-dkg-c4-logs
+          path: p2p-dkg-c4.out
+
+  state-db-c1:
+    name: state-db chunk 1/4 (6h)
+    runs-on: ubuntu-latest
+    timeout-minutes: 370
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+      - name: Stress FileStore (chunk)
+        run: bash ./.github/scripts/go-test-loop.sh ./internal/state ${{ env.CHUNK_MIN }} state-db-c1.out -race -run . || true
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: state-db-c1-logs
+          path: state-db-c1.out
+
+  state-db-c2:
+    name: state-db chunk 2/4 (6h)
+    runs-on: ubuntu-latest
+    needs: [state-db-c1]
+    timeout-minutes: 370
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+      - name: Stress FileStore (chunk)
+        run: bash ./.github/scripts/go-test-loop.sh ./internal/state ${{ env.CHUNK_MIN }} state-db-c2.out -race -run . || true
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: state-db-c2-logs
+          path: state-db-c2.out
+
+  state-db-c3:
+    name: state-db chunk 3/4 (6h)
+    runs-on: ubuntu-latest
+    needs: [state-db-c2]
+    timeout-minutes: 370
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+      - name: Stress FileStore (chunk)
+        run: bash ./.github/scripts/go-test-loop.sh ./internal/state ${{ env.CHUNK_MIN }} state-db-c3.out -race -run . || true
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: state-db-c3-logs
+          path: state-db-c3.out
+
+  state-db-c4:
+    name: state-db chunk 4/4 (6h)
+    runs-on: ubuntu-latest
+    needs: [state-db-c3]
+    timeout-minutes: 370
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+      - name: Stress FileStore (chunk)
+        run: bash ./.github/scripts/go-test-loop.sh ./internal/state ${{ env.CHUNK_MIN }} state-db-c4.out -race -run . || true
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: state-db-c4-logs
+          path: state-db-c4.out
+
+  chaos-e2e-c1:
+    name: chaos-e2e chunk 1/4 (6h)
+    runs-on: ubuntu-latest
+    timeout-minutes: 370
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check Docker environment
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker --version
+          docker info -f '{{.ServerVersion}}'
+          if docker compose version >/dev/null 2>&1; then
+            echo "DOCKER_COMPOSE=docker compose" >> $GITHUB_ENV
+          else
+            sudo apt-get update -y
+            sudo apt-get install -y docker-compose
+            echo "DOCKER_COMPOSE=docker-compose" >> $GITHUB_ENV
+          fi
+      - name: Bring up cluster
+        run: ${DOCKER_COMPOSE} up -d
+      - name: Probe and churn (chunk)
+        shell: bash
+        run: |
+          minutes=${CHUNK_MIN}
+          end=$(( $(date +%s) + minutes*60 ))
+          ok=1
+          : > chaos-e2e-c1.out
+          while [ $(date +%s) -lt $end ]; do
+            for i in 0 1 2 3; do
+              if ! curl -fsS localhost:$((4620+i))>/dev/null; then ok=0; echo "metrics probe fail on node $i" | tee -a chaos-e2e-c1.out; fi
+            done
+            n=$((RANDOM % 4))
+            ${DOCKER_COMPOSE} restart aequa-node-$n || true
+            sleep 10
+          done
+      - name: Collect logs
+        if: always()
+        run: |
+          for c in aequa-node-0 aequa-node-1 aequa-node-2 aequa-node-3; do docker logs $c --since 6h || true; done | tee chaos-e2e-c1.out
+      - name: Tear down
+        if: always()
+        run: ${DOCKER_COMPOSE} down -v || true
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: chaos-e2e-c1-logs
+          path: chaos-e2e-c1.out
+
+  chaos-e2e-c2:
+    name: chaos-e2e chunk 2/4 (6h)
+    runs-on: ubuntu-latest
+    needs: [chaos-e2e-c1]
+    timeout-minutes: 370
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check Docker environment
+        run: |
+          if docker compose version >/dev/null 2>&1; then echo "DOCKER_COMPOSE=docker compose" >> $GITHUB_ENV; else sudo apt-get update -y && sudo apt-get install -y docker-compose && echo "DOCKER_COMPOSE=docker-compose" >> $GITHUB_ENV; fi
+      - name: Bring up cluster
+        run: ${DOCKER_COMPOSE} up -d
+      - name: Probe and churn (chunk)
+        run: |
+          minutes=${CHUNK_MIN}; end=$(( $(date +%s) + minutes*60 )); : > chaos-e2e-c2.out; while [ $(date +%s) -lt $end ]; do for i in 0 1 2 3; do curl -fsS localhost:$((4620+i))>/dev/null || echo "metrics probe fail on node $i" | tee -a chaos-e2e-c2.out; done; n=$((RANDOM % 4)); ${DOCKER_COMPOSE} restart aequa-node-$n || true; sleep 10; done
+      - name: Collect logs
+        if: always()
+        run: |
+          for c in aequa-node-0 aequa-node-1 aequa-node-2 aequa-node-3; do docker logs $c --since 6h || true; done | tee chaos-e2e-c2.out
+      - name: Tear down
+        if: always()
+        run: ${DOCKER_COMPOSE} down -v || true
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: chaos-e2e-c2-logs
+          path: chaos-e2e-c2.out
+
+  chaos-e2e-c3:
+    name: chaos-e2e chunk 3/4 (6h)
+    runs-on: ubuntu-latest
+    needs: [chaos-e2e-c2]
+    timeout-minutes: 370
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check Docker environment
+        run: |
+          if docker compose version >/dev/null 2>&1; then echo "DOCKER_COMPOSE=docker compose" >> $GITHUB_ENV; else sudo apt-get update -y && sudo apt-get install -y docker-compose && echo "DOCKER_COMPOSE=docker-compose" >> $GITHUB_ENV; fi
+      - name: Bring up cluster
+        run: ${DOCKER_COMPOSE} up -d
+      - name: Probe and churn (chunk)
+        run: |
+          minutes=${CHUNK_MIN}; end=$(( $(date +%s) + minutes*60 )); : > chaos-e2e-c3.out; while [ $(date +%s) -lt $end ]; do for i in 0 1 2 3; do curl -fsS localhost:$((4620+i))>/dev/null || echo "metrics probe fail on node $i" | tee -a chaos-e2e-c3.out; done; n=$((RANDOM % 4)); ${DOCKER_COMPOSE} restart aequa-node-$n || true; sleep 10; done
+      - name: Collect logs
+        if: always()
+        run: |
+          for c in aequa-node-0 aequa-node-1 aequa-node-2 aequa-node-3; do docker logs $c --since 6h || true; done | tee chaos-e2e-c3.out
+      - name: Tear down
+        if: always()
+        run: ${DOCKER_COMPOSE} down -v || true
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: chaos-e2e-c3-logs
+          path: chaos-e2e-c3.out
+
+  chaos-e2e-c4:
+    name: chaos-e2e chunk 4/4 (6h)
+    runs-on: ubuntu-latest
+    needs: [chaos-e2e-c3]
+    timeout-minutes: 370
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check Docker environment
+        run: |
+          if docker compose version >/dev/null 2>&1; then echo "DOCKER_COMPOSE=docker compose" >> $GITHUB_ENV; else sudo apt-get update -y && sudo apt-get install -y docker-compose && echo "DOCKER_COMPOSE=docker-compose" >> $GITHUB_ENV; fi
+      - name: Bring up cluster
+        run: ${DOCKER_COMPOSE} up -d
+      - name: Probe and churn (chunk)
+        run: |
+          minutes=${CHUNK_MIN}; end=$(( $(date +%s) + minutes*60 )); : > chaos-e2e-c4.out; while [ $(date +%s) -lt $end ]; do for i in 0 1 2 3; do curl -fsS localhost:$((4620+i))>/dev/null || echo "metrics probe fail on node $i" | tee -a chaos-e2e-c4.out; done; n=$((RANDOM % 4)); ${DOCKER_COMPOSE} restart aequa-node-$n || true; sleep 10; done
+      - name: Collect logs
+        if: always()
+        run: |
+          for c in aequa-node-0 aequa-node-1 aequa-node-2 aequa-node-3; do docker logs $c --since 6h || true; done | tee chaos-e2e-c4.out
+      - name: Tear down
+        if: always()
+        run: ${DOCKER_COMPOSE} down -v || true
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: chaos-e2e-c4-logs
+          path: chaos-e2e-c4.out
+
+  aggregate:
+    name: aggregate-report
+    runs-on: ubuntu-latest
+    needs:
+      - cluster-health
+      - api-fuzz-c4
+      - qbft-fuzz-c4
+      - p2p-dkg-c4
+      - state-db-c4
+      - chaos-e2e-c4
+    if: always()
+    steps:
+      - name: Build summary
+        shell: bash
+        run: |
+          echo "# M4 Long-run (4×6h) Summary" >> $GITHUB_STEP_SUMMARY
+          echo "\nAll chunk logs are uploaded as artifacts (per suite per chunk)." >> $GITHUB_STEP_SUMMARY
