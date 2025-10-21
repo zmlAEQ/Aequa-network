@@ -25,11 +25,11 @@ jobs:
           : > dkg-attack.out
           while [ $(date +%s) -lt $end ]; do
             i=$((i+1)); echo "[iter $i]" | tee -a dkg-attack.out
-            E2E_DKG_MODE=invalid ${{ env.DOCKER_COMPOSE }} up -d || true
+            E2E_DKG_MODE=invalid ${DOCKER_COMPOSE} up -d || true
             sleep 5
-            ${{ env.DOCKER_COMPOSE }} ps | tee -a dkg-attack.out || true
+            ${DOCKER_COMPOSE} ps | tee -a dkg-attack.out || true
             for c in aequa-node-0 aequa-node-1 aequa-node-2 aequa-node-3; do docker logs $c --since 2m || true; done | tee -a dkg-attack.out
-            ${{ env.DOCKER_COMPOSE }} down -v || true
+            ${DOCKER_COMPOSE} down -v || true
           done
       - uses: actions/upload-artifact@v4
         if: always()
