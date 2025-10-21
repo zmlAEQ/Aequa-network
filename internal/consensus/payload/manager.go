@@ -1,4 +1,4 @@
-﻿package payload
+package payload
 
 import (
     "crypto/sha256"
