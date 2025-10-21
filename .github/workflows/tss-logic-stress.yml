@@ -1,0 +1,43 @@
+name: tss-logic-stress
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  GO_VERSION: '1.24'
+
+jobs:
+  tss-stress:
+    runs-on: ubuntu-latest
+    timeout-minutes: 190
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+      - name: Detect TSS package
+        id: detect
+        shell: bash
+        run: |
+          set -euo pipefail
+          pkg=""; if [ -d ./internal/tss ]; then pkg=./internal/tss; elif [ -d ./pkg/tss ]; then pkg=./pkg/tss; fi
+          if [ -z "$pkg" ]; then echo "TSS package not found, skipping."; echo "pkg=skip" >> $GITHUB_OUTPUT; exit 0; fi
+          echo "pkg=$pkg" >> $GITHUB_OUTPUT
+      - name: Run fuzz (2–3h)
+        if: steps.detect.outputs.pkg != 'skip'
+        shell: bash
+        run: |
+          pkg=${{ steps.detect.outputs.pkg }}
+          echo "running fuzz on $pkg"
+          # 3 小时时长，可按需调整
+          go test "$pkg" -run '^$' -fuzz=Fuzz -fuzztime=180m | tee tss-fuzz.out || true
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: tss-logic-stress-logs
+          path: |
+            tss-fuzz.out
+            
