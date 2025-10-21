@@ -112,11 +112,11 @@ func (fs *FileStore) SaveLastState(_ context.Context, s LastState) error {
     ms := float64(time.Since(start).Milliseconds())
     if err != nil {
         metrics.Inc("state_persist_errors_total", nil)
-        logger.ErrorJ("consensus_state", map[string]any{"op":"persist", "result":"error", "err": err.Error()})
+        logger.ErrorJ("consensus_state", map[string]any{"op":"persist", "result":"error", "err": err.Error(), "trace_id": ""})
         return err
     }
     metrics.ObserveSummary("state_persist_ms", nil, ms)
-    logger.InfoJ("consensus_state", map[string]any{"op":"persist", "result":"ok", "height": s.Height, "round": s.Round, "latency_ms": ms})
+    logger.InfoJ("consensus_state", map[string]any{"op":"persist", "result":"ok", "height": s.Height, "round": s.Round, "latency_ms": ms, "trace_id": ""})
     return nil
 }
 
@@ -128,20 +128,19 @@ func (fs *FileStore) LoadLastState(_ context.Context) (LastState, error) {
     // Try main
     if s, err := readFile(fs.path); err == nil {
         metrics.Inc("state_recovery_total", map[string]string{"result": "ok"})
-        logger.InfoJ("consensus_state", map[string]any{"op":"recovery", "result":"ok", "height": s.Height, "round": s.Round})
+        logger.InfoJ("consensus_state", map[string]any{"op":"recovery", "result":"ok", "height": s.Height, "round": s.Round, "trace_id": ""})
         return s, nil
     }
     // Try backup
     if s, err := readFile(fs.path + ".bak"); err == nil {
         metrics.Inc("state_recovery_total", map[string]string{"result": "fallback"})
-        logger.InfoJ("consensus_state", map[string]any{"op":"recovery", "result":"fallback", "height": s.Height, "round": s.Round})
+        logger.InfoJ("consensus_state", map[string]any{"op":"recovery", "result":"fallback", "height": s.Height, "round": s.Round, "trace_id": ""})
         return s, nil
     }
     metrics.Inc("state_recovery_total", map[string]string{"result": "fail"})
-    logger.InfoJ("consensus_state", map[string]any{"op":"recovery", "result":"miss"})
+    logger.InfoJ("consensus_state", map[string]any{"op":"recovery", "result":"miss", "trace_id": ""})
     return LastState{}, ErrNotFound
 }
 
 // Close implements Store. For FileStore it is a no-op.
 func (fs *FileStore) Close() error { return nil }
-

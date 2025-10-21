@@ -35,10 +35,12 @@ func (s *Service) Start(ctx context.Context) error {
     if s.v == nil { s.v = qbft.NewBasicVerifierWithPolicy(qbft.DefaultPolicy()) }
     if s.store == nil { s.store = state.NewMemoryStore() }
     if s.st == nil { s.st = &qbft.State{} }
+    // Start E2E attack/testing endpoint when built with tag "e2e" (no-op otherwise).
+    startE2E(s)
     if ls, err := s.store.LoadLastState(ctx); err != nil {
-        logger.InfoJ("consensus_state", map[string]any{"op":"load", "result":"miss", "err": err.Error()})
+        logger.InfoJ("consensus_state", map[string]any{"op":"load", "result":"miss", "err": err.Error(), "trace_id": ""})
     } else {
-        logger.InfoJ("consensus_state", map[string]any{"op":"load", "result":"ok", "height": ls.Height, "round": ls.Round})
+        logger.InfoJ("consensus_state", map[string]any{"op":"load", "result":"ok", "height": ls.Height, "round": ls.Round, "trace_id": ""})
     }
     go func() {
         ticker := time.NewTicker(5 * time.Second)
@@ -56,9 +58,9 @@ func (s *Service) Start(ctx context.Context) error {
                 if err := s.v.Verify(msg); err == nil {
                     _ = s.st.Process(msg)
                     if err2 := s.store.SaveLastState(ctx, state.LastState{Height: msg.Height, Round: msg.Round}); err2 != nil {
-                        logger.ErrorJ("consensus_state", map[string]any{"op":"save", "result":"error", "err": err2.Error()})
+                        logger.ErrorJ("consensus_state", map[string]any{"op":"save", "result":"error", "err": err2.Error(), "trace_id": ev.TraceID})
                     } else {
-                        logger.InfoJ("consensus_state", map[string]any{"op":"save", "result":"ok", "height": msg.Height, "round": msg.Round})
+                        logger.InfoJ("consensus_state", map[string]any{"op":"save", "result":"ok", "height": msg.Height, "round": msg.Round, "trace_id": ev.TraceID})
                     }
                 }
                 durMs := time.Since(begin).Milliseconds()
