@@ -1,4 +1,4 @@
-﻿services:
+services:
   aequa-node-0:
     build: .
     image: aequa-local:latest
@@ -6,6 +6,8 @@
     command: ["--validator-api","0.0.0.0:4600","--monitoring","0.0.0.0:4620"]
     ports:
       - "4600:4600"
+      - "4610:4610"
+      - "4615:4615"
       - "4620:4620"
   aequa-node-1:
     image: aequa-local:latest
@@ -13,6 +15,8 @@
     command: ["--validator-api","0.0.0.0:4600","--monitoring","0.0.0.0:4620"]
     ports:
       - "4601:4600"
+      - "4611:4610"
+      - "4616:4615"
       - "4621:4620"
   aequa-node-2:
     image: aequa-local:latest
@@ -20,6 +24,8 @@
     command: ["--validator-api","0.0.0.0:4600","--monitoring","0.0.0.0:4620"]
     ports:
       - "4602:4600"
+      - "4612:4610"
+      - "4617:4615"
       - "4622:4620"
   aequa-node-3:
     image: aequa-local:latest
@@ -27,4 +33,24 @@
     command: ["--validator-api","0.0.0.0:4600","--monitoring","0.0.0.0:4620"]
     ports:
       - "4603:4600"
+      - "4613:4610"
+      - "4618:4615"
       - "4623:4620"
+
+  adversary-agent:
+    build:
+      context: .
+      dockerfile: Dockerfile.attacker
+    image: aequa-attacker:latest
+    container_name: adversary-agent
+    environment:
+      ENDPOINTS_QBFT: "http://aequa-node-0:4610,http://aequa-node-1:4610,http://aequa-node-2:4610,http://aequa-node-3:4610"
+      ENDPOINTS_P2P: "http://aequa-node-0:4615,http://aequa-node-1:4615,http://aequa-node-2:4615,http://aequa-node-3:4615"
+      P2P_ID_PREFIX: "X"
+      P2P_MAX_IDS: "1024"
+    depends_on:
+      - aequa-node-0
+      - aequa-node-1
+      - aequa-node-2
+      - aequa-node-3
+    restart: unless-stopped
