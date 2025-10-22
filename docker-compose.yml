@@ -1,4 +1,4 @@
-﻿services:
+services:
   aequa-node-0:
     build: .
     image: aequa-local:latest
@@ -7,7 +7,7 @@
     ports:
       - "4600:4600"
       - "4610:4610"
-      - "4620:4620"
+      - "4610:4610"`n      - "4615:4615"`n      - "4620:4620"
   aequa-node-1:
     image: aequa-local:latest
     container_name: aequa-node-1
@@ -15,7 +15,7 @@
     ports:
       - "4601:4600"
       - "4611:4610"
-      - "4621:4620"
+      - "4611:4610"`n      - "4616:4615"`n      - "4621:4620"
   aequa-node-2:
     image: aequa-local:latest
     container_name: aequa-node-2
@@ -23,7 +23,7 @@
     ports:
       - "4602:4600"
       - "4612:4610"
-      - "4622:4620"
+      - "4612:4610"`n      - "4617:4615"`n      - "4622:4620"
   aequa-node-3:
     image: aequa-local:latest
     container_name: aequa-node-3
@@ -31,4 +31,5 @@
     ports:
       - "4603:4600"
       - "4613:4610"
-      - "4623:4620"
+      - "4613:4610"`n      - "4618:4615"`n      - "4623:4620"
+
