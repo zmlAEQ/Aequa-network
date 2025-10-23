@@ -33,6 +33,14 @@ jobs:
           docker build -f Dockerfile.attacker -t aequa-attacker:latest .
       - name: Up cluster with attacker (compose)
         run: ${{ env.DOCKER_COMPOSE }} up --build -d
+      - name: Warm-up metrics (wait up to 90s)
+        shell: bash
+        run: |
+          for i in 0 1 2 3; do \
+            for t in {1..9}; do \
+              if curl -fsS localhost:$((4620+i))/metrics >/dev/null; then echo "node $i metrics ok"; break; else echo "waiting metrics on node $i ($t/9)"; sleep 10; fi; \
+            done; \
+          done
       - name: Probe + netem + churn (chunk)
         shell: bash
         run: |
