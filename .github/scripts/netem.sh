@@ -18,17 +18,17 @@ apply_mode() {
   local mode=$1
   for n in "${nodes[@]}"; do
     case "$mode" in
-      delay)     docker exec netem-$n sh -lc 'tc qdisc replace dev eth0 root netem delay 100ms 20ms' ;;
-      loss)      docker exec netem-$n sh -lc 'tc qdisc replace dev eth0 root netem loss 2% 25%' ;;
-      reorder)   docker exec netem-$n sh -lc 'tc qdisc replace dev eth0 root netem reorder 25% 50% delay 20ms' ;;
-      partition) docker exec netem-$n sh -lc 'tc qdisc replace dev eth0 root netem loss 100%' ;;
+      delay)     docker exec netem-$n sh -lc 'tc qdisc replace dev eth0 root netem delay 100ms 20ms || true' || true ;;
+      loss)      docker exec netem-$n sh -lc 'tc qdisc replace dev eth0 root netem loss 2% 25% || true' || true ;;
+      reorder)   docker exec netem-$n sh -lc 'tc qdisc replace dev eth0 root netem reorder 25% 50% delay 20ms || true' || true ;;
+      partition) docker exec netem-$n sh -lc 'tc qdisc replace dev eth0 root netem loss 100% || true' || true ;;
       *) echo "unknown mode: $mode"; exit 1 ;;
     esac
   done
 }
 
 clear_mode() {
-  for n in "${nodes[@]}"; do docker exec netem-$n sh -lc 'tc qdisc del dev eth0 root || true'; done
+  for n in "${nodes[@]}"; do docker exec netem-$n sh -lc 'tc qdisc del dev eth0 root || true' || true; done
 }
 
 case "${1:-}" in
