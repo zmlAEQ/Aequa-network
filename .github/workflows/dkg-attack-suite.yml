@@ -1,0 +1,38 @@
+name: dkg-attack-suite
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  dkg-loop:
+    runs-on: ubuntu-latest
+    timeout-minutes: 190
+    steps:
+      - uses: actions/checkout@v4
+      - name: Prepare compose
+        run: |
+          if docker compose version >/dev/null 2>&1; then echo DOCKER_COMPOSE="docker compose" >> $GITHUB_ENV; else sudo apt-get update -y && sudo apt-get install -y docker-compose && echo DOCKER_COMPOSE="docker-compose" >> $GITHUB_ENV; fi
+      - name: Build e2e image
+        run: docker build --build-arg BUILD_TAGS=e2e -t aequa-local:latest .
+      - name: Run DKG fail-fast loop (~3h)
+        shell: bash
+        run: |
+          end=$(( $(date +%s) + 3*60*60 ))
+          i=0
+          : > dkg-attack.out
+          while [ $(date +%s) -lt $end ]; do
+            i=$((i+1)); echo "[iter $i]" | tee -a dkg-attack.out
+            E2E_DKG_MODE=invalid ${DOCKER_COMPOSE} up -d || true
+            sleep 5
+            ${DOCKER_COMPOSE} ps | tee -a dkg-attack.out || true
+            for c in aequa-node-0 aequa-node-1 aequa-node-2 aequa-node-3; do docker logs $c --since 2m || true; done | tee -a dkg-attack.out
+            ${DOCKER_COMPOSE} down -v || true
+          done
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: dkg-attack-logs
+          path: dkg-attack.out
